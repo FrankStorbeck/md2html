@@ -29,3 +29,25 @@ func TestStyling(t *testing.T) {
 		}
 	}
 }
+
+func TestOlnlyRunes(t *testing.T) {
+	tests := []struct {
+		s    string
+		want bool
+	}{
+		{s: "", want: false},
+		{s: "==", want: false},
+		{s: "===", want: true},
+		{s: "=======", want: true},
+		{s: "=======x", want: false},
+		{s: "====x==", want: false},
+	}
+
+	for _, tst := range tests {
+		got := onlyRunes(tst.s, '=')
+		if got != tst.want {
+			t.Errorf("'onlyRunes(%q, '=')' genereert: %t, moet zijn: %t",
+				tst.s, got, tst.want)
+		}
+	}
+}

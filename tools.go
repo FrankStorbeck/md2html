@@ -27,6 +27,19 @@ func esc2uni(s string, esc []byte) string {
 	return string(b)
 }
 
+// onlyRunes tests if a string of at least three runes 'rn' and no other runes.
+func onlyRunes(s string, rn rune) bool {
+	if len(s) < 3 {
+		return false
+	}
+	for _, r := range s {
+		if r != rn {
+			return false
+		}
+	}
+	return true
+}
+
 // uni2esc replaces unicode by its (non escaped) character.
 func uni2esc(s string, esc []byte) string {
 	b := []byte(s)
