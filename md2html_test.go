@@ -23,9 +23,45 @@ func TestStyling(t *testing.T) {
 		{s: "~~bb~~yy", want: "<del>bb</del>yy"},
 	}
 	for _, tst := range tests {
-		got := setStrongEmDel(tst.s)
+		got := StrongEmDel(tst.s)
 		if got != tst.want {
-			t.Errorf("setStrongEmDel(%q) generates %q, should be %q", tst.s, got, tst.want)
+			t.Errorf("StrongEmDel(%q) generates %q, should be %q", tst.s, got, tst.want)
+		}
+	}
+}
+
+func TestUniCode(t *testing.T) {
+	tests := []struct {
+		s    string
+		want string
+	}{
+		{s: "a \\* b", want: "a U+002A b"},
+		{s: "\\* b", want: "U+002A b"},
+		{s: "a \\*", want: "a U+002A"},
+		{s: "a \\_ b", want: "a \\_ b"},
+	}
+	for _, tst := range tests {
+		got := UniCode(tst.s, []byte{'*'})
+		if got != tst.want {
+			t.Errorf("UniCode(%q, []byte{'*'}) generates %q, should be %q", tst.s, got, tst.want)
+		}
+	}
+}
+
+func TestUnEscape(t *testing.T) {
+	tests := []struct {
+		s    string
+		want string
+	}{
+		{s: "a U+002A b", want: "a * b"},
+		{s: "U+002A b", want: "* b"},
+		{s: "a U+002A", want: "a *"},
+		{s: "a U+002B b", want: "a U+002B b"},
+	}
+	for _, tst := range tests {
+		got := UnEscape(tst.s, []byte{'*'})
+		if got != tst.want {
+			t.Errorf("UnEscape(%q, []byte{'*'}) generates %q, should be %q", tst.s, got, tst.want)
 		}
 	}
 }
@@ -44,9 +80,9 @@ func TestOlnlyRunes(t *testing.T) {
 	}
 
 	for _, tst := range tests {
-		got := onlyRunes(tst.s, '=')
+		got := OnlyRunes(tst.s, '=')
 		if got != tst.want {
-			t.Errorf("'onlyRunes(%q, '=')' genereert: %t, moet zijn: %t",
+			t.Errorf("'OnlyRunes(%q, '=')' genereert: %t, moet zijn: %t",
 				tst.s, got, tst.want)
 		}
 	}

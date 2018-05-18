@@ -15,20 +15,8 @@ import (
 	"fmt"
 )
 
-// esc2uni replaces escaped characters by its uni code. A character is escaped
-// by putting a '\' in front of it.
-func esc2uni(s string, esc []byte) string {
-	b := []byte(s)
-	for _, sp := range esc {
-		old := []byte{'\\', sp}
-		new := []byte(fmt.Sprintf("U+%04X", sp))
-		b = bytes.Replace(b, old, new, -1)
-	}
-	return string(b)
-}
-
-// onlyRunes tests if a string of at least three runes 'rn' and no other runes.
-func onlyRunes(s string, rn rune) bool {
+// OnlyRunes tests if a string of at least three runes 'rn' and no other runes.
+func OnlyRunes(s string, rn rune) bool {
 	if len(s) < 3 {
 		return false
 	}
@@ -40,8 +28,8 @@ func onlyRunes(s string, rn rune) bool {
 	return true
 }
 
-// uni2esc replaces unicode by its (non escaped) character.
-func uni2esc(s string, esc []byte) string {
+// UnEscape replaces unicode by its (non escaped) character.
+func UnEscape(s string, esc []byte) string {
 	b := []byte(s)
 
 	for _, sp := range esc {
@@ -50,5 +38,17 @@ func uni2esc(s string, esc []byte) string {
 		b = bytes.Replace(b, old, new, -1)
 	}
 
+	return string(b)
+}
+
+// UniCode replaces escaped characters by its uni code. A character is escaped
+// by putting a '\' in front of it.
+func UniCode(s string, esc []byte) string {
+	b := []byte(s)
+	for _, sp := range esc {
+		old := []byte{'\\', sp}
+		new := []byte(fmt.Sprintf("U+%04X", sp))
+		b = bytes.Replace(b, old, new, -1)
+	}
 	return string(b)
 }

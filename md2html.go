@@ -18,9 +18,9 @@ import (
 	"source.storbeck.nl/md2html2/branch"
 )
 
-// setStrongEmDel translates mark down strong, emphasis and deleted definitions
+// StrongEmDel translates mark down strong, emphasis and deleted definitions
 // to their html equivalents
-func setStrongEmDel(s string) string {
+func StrongEmDel(s string) string {
 	tgs := []struct {
 		tg  string
 		sep []string
@@ -34,7 +34,7 @@ func setStrongEmDel(s string) string {
 	for i, tg := range tgs {
 		seps[i] = tg.sep[0][0]
 	}
-	rslt := esc2uni(s, seps)
+	rslt := UniCode(s, seps)
 
 	for _, t := range tgs {
 		for _, sp := range t.sep {
@@ -59,7 +59,7 @@ func setStrongEmDel(s string) string {
 		}
 	}
 
-	return uni2esc(rslt, seps)
+	return UnEscape(rslt, seps)
 }
 
 func main() {
