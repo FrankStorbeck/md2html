@@ -20,8 +20,33 @@ import (
 // HTMLTree is a struct for holding the data for the construction of a HTML
 // tree.
 type HTMLTree struct {
-	br   *branch.Branch // current branch
-	root *branch.Branch // root branch
+	br      *branch.Branch // current branch
+	inBlock bool           // true while in blockQuote
+	root    *branch.Branch // root branch
+}
+
+// BlockQuote adds string 's' as a block quote. If it isn't a continuation of
+// a bock quote, it will be initialized.
+func (ht *HTMLTree) BlockQuote(s string) error {
+	var err error
+
+	if !ht.inBlock {
+		b := ht.br
+		ht.br, err = ht.br.Parent(1)
+		ht.RmIfEmpty(b)
+		if err != nil {
+			return err
+		}
+		ht.br, _ = ht.br.AddBranch(-1, "blockquote")
+	}
+
+	ht.inBlock = true
+
+	if len(s) > 1 {
+		ht.br.Add(-1, strings.TrimSpace(s[1:]))
+	}
+
+	return nil
 }
 
 // Build reconstructs the HTML tree based on the contents of 's'.
@@ -43,8 +68,27 @@ func (ht *HTMLTree) Build(s string) error {
 			// <h'leadingHash'> line
 			ht.Header(s[leadingHash:], leadingHash)
 
+		case s[0] == '>':
+			// block quote
+			err = ht.BlockQuote(s)
+
 		default:
+			if ht.inBlock {
+				ht.inBlock = false
+				ht.br, err = ht.br.Parent(1)
+				if err != nil {
+					return err
+				}
+				ht.br, _ = ht.br.AddBranch(-1, "p")
+			}
 			ht.br.Add(-1, s)
+		}
+	} else {
+		switch {
+		case ht.inBlock:
+			ht.br.Add(-1, "<br>")
+
+		default:
 		}
 	}
 	return err
