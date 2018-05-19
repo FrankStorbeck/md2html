@@ -120,6 +120,10 @@ func TestBuild(t *testing.T) {
 		// Headers
 		{s: []string{"hdr1", "==="}, want: "r{h1{hdr1} p{}}"},
 		{s: []string{"hdr2", "---"}, want: "r{h2{hdr2} p{}}"},
+		{s: []string{"aa", "# hdr1", "bb"}, want: "r{p{aa} h1{hdr1} p{bb}}"},
+		{s: []string{"aa", "### hdr3", "bb"}, want: "r{p{aa} h3{hdr3} p{bb}}"},
+		{s: []string{"###### hdr6"}, want: "r{h6{hdr6} p{}}"},
+		{s: []string{"####### hdr7"}, want: "r{p{####### hdr7}}"},
 	}
 	for _, tst := range tests {
 		ht := NewHTMLTree("r")

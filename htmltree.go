@@ -27,6 +27,7 @@ type HTMLTree struct {
 // Build reconstructs the HTML tree based on the contents of 's'.
 func (ht *HTMLTree) Build(s string) error {
 	var err error
+	leadingHash := CountLeading(s, '#', 6)
 
 	if l := len(s); l > 0 {
 		switch {
@@ -37,6 +38,10 @@ func (ht *HTMLTree) Build(s string) error {
 		case OnlyRunes(s, '-'):
 			// previous line was a <h2> line
 			ht.ChangePrevToHdr(s)
+
+		case leadingHash > 0:
+			// <h'leadingHash'> line
+			ht.Header(s[leadingHash:], leadingHash)
 
 		default:
 			ht.br.Add(-1, s)
