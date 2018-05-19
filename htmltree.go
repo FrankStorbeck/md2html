@@ -14,7 +14,7 @@ import (
 	"fmt"
 	"strings"
 
-	"source.storbeck.nl/md2html2/branch"
+	"source.storbeck.nl/md2html/branch"
 )
 
 // HTMLTree is a struct for holding the data for the construction of a HTML
@@ -22,6 +22,7 @@ import (
 type HTMLTree struct {
 	br      *branch.Branch // current branch
 	inBlock bool           // true while in blockQuote
+	sCount  int            // string number
 	root    *branch.Branch // root branch
 }
 
@@ -31,9 +32,7 @@ func (ht *HTMLTree) BlockQuote(s string) error {
 	var err error
 
 	if !ht.inBlock {
-		b := ht.br
-		ht.br, err = ht.br.Parent(1)
-		ht.RmIfEmpty(b)
+		err = ht.TryParent(1)
 		if err != nil {
 			return err
 		}
@@ -52,6 +51,7 @@ func (ht *HTMLTree) BlockQuote(s string) error {
 // Build reconstructs the HTML tree based on the contents of 's'.
 func (ht *HTMLTree) Build(s string) error {
 	var err error
+	ht.sCount++
 	leadingHash := CountLeading(s, '#', 6)
 
 	if l := len(s); l > 0 {
@@ -75,7 +75,7 @@ func (ht *HTMLTree) Build(s string) error {
 		default:
 			if ht.inBlock {
 				ht.inBlock = false
-				ht.br, err = ht.br.Parent(1)
+				err = ht.TryParent(1)
 				if err != nil {
 					return err
 				}
@@ -142,6 +142,30 @@ func (ht *HTMLTree) RmIfEmpty(brnch *branch.Branch) error {
 			_, err = ht.br.Remove(i)
 			return err
 		}
+	}
+	return nil
+}
+
+// TryParent goes safely to the 'n'-th parent of the current branch.
+func (ht *HTMLTree) TryParent(n int) error {
+	var err error
+	if ht.br == nil {
+		ht.br = ht.root
+		return nil
+	}
+	for n > 0 {
+		if ht.br == ht.root {
+			return nil
+		}
+		b := ht.br
+		ht.br, err = ht.br.Parent(1)
+		if err != nil {
+			err = fmt.Errorf("TryParent (%d): %s", ht.sCount, err)
+			return err
+		}
+
+		ht.RmIfEmpty(b)
+		n--
 	}
 	return nil
 }

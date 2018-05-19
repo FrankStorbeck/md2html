@@ -15,7 +15,7 @@ import (
 	"fmt"
 	"strings"
 
-	"source.storbeck.nl/md2html2/branch"
+	"source.storbeck.nl/md2html/branch"
 )
 
 // StrongEmDel translates mark down strong, emphasis and deleted definitions
