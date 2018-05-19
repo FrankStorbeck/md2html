@@ -61,7 +61,9 @@ func (ht *HTMLTree) ChangePrevToHdr(line string) {
 
 // Header adds a header line with level 'n' to the HTML tree.
 func (ht *HTMLTree) Header(line string, n int) {
+	b := ht.br
 	ht.br = ht.root
+	ht.RmIfEmpty(b)
 	ht.br, _ = ht.br.AddBranch(-1, fmt.Sprintf("h%d", n))
 	ht.br.Add(-1, strings.TrimSpace(line))
 	ht.br, _ = ht.root.AddBranch(-1, "p")
@@ -74,4 +76,15 @@ func NewHTMLTree(s string) HTMLTree {
 	}
 	ht.br = ht.root
 	return ht
+}
+
+// RmIfEmpty removes the branch 'brnch' if it is empty.
+func (ht *HTMLTree) RmIfEmpty(brnch *branch.Branch) error {
+	if brnch != ht.root && brnch.Len() <= 0 {
+		if i, err := ht.br.Index(brnch); err == nil {
+			_, err = ht.br.Remove(i)
+			return err
+		}
+	}
+	return nil
 }
