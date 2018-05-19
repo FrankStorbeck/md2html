@@ -1,6 +1,8 @@
 package main
 
-import "testing"
+import (
+	"testing"
+)
 
 func TestStyling(t *testing.T) {
 	tests := []struct {
@@ -106,6 +108,33 @@ func TestCountLeading(t *testing.T) {
 		if n != tst.want {
 			t.Errorf("'CountLeading(%q)' generates: %d, should be: %d",
 				tst.s, n, tst.want)
+		}
+	}
+}
+
+func TestBuild(t *testing.T) {
+	tests := []struct {
+		s    []string
+		want string
+	}{
+		// Headers
+		{s: []string{"hdr", "==="}, want: "r{p{} h1{hdr} p{}}"},
+	}
+	for _, tst := range tests {
+		ht := NewHTMLTree("r")
+		ht.br, _ = ht.br.AddBranch(-1, "p")
+
+		for _, s := range tst.s {
+			err := ht.Build(s)
+			if err != nil {
+				t.Fatalf("Build(%q) returns error: %s, should be nil", s, err)
+			}
+		}
+
+		got := ht.root.String()
+		if got != tst.want {
+			t.Errorf("Build(%q)... generates %q, should be %q",
+				tst.s[0], got, tst.want)
 		}
 	}
 }

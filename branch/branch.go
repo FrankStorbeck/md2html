@@ -91,6 +91,11 @@ func escape(s string) string {
 	return r
 }
 
+// NewBranch returns a pointer to a new Branch struct with identifier 's'.
+func NewBranch(s string) *Branch {
+	return &Branch{ID: s, siblings: make([]interface{}, 0)}
+}
+
 // Parent returns a pointer to the 'n'-th parent of branch. If 'n' is less than
 // one a pointer to itself will be returned. When an error occured, nil and the
 // error will be returned.
