@@ -32,6 +32,10 @@ func (ht *HTMLTree) Build(s string) error {
 		switch {
 		case OnlyRunes(s, '='):
 			// previous line was a <h1> line
+			fallthrough
+
+		case OnlyRunes(s, '-'):
+			// previous line was a <h2> line
 			ht.ChangePrevToHdr(s)
 
 		default:
@@ -42,17 +46,21 @@ func (ht *HTMLTree) Build(s string) error {
 }
 
 // ChangePrevToHdr changes the string that was added just before into a header
-// line.
-func (ht *HTMLTree) ChangePrevToHdr(line string) {
+// line. If 's' contains '-' runes, it will be a level 2, otherwise a leve 1.
+func (ht *HTMLTree) ChangePrevToHdr(s string) {
 	prev, err := ht.br.Remove(-1)
 	if err != nil {
-		// Remove failed, add the line to a new <p>
+		// Remove failed, add the string to a new <p>
 		ht.br, _ = ht.root.AddBranch(-1, "p")
-		ht.br.Add(-1, line)
+		ht.br.Add(-1, s)
 	} else {
-		s, ok := prev.(string)
+		ps, ok := prev.(string)
 		if ok { // 'prev' must be a string
-			ht.Header(s, 1)
+			lvl := 1
+			if s[0] == '-' {
+				lvl = 2
+			}
+			ht.Header(ps, lvl)
 		} else {
 			ht.br.Add(-1, prev) // restore 'prev'
 		}
