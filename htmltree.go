@@ -24,6 +24,7 @@ type HTMLTree struct {
 	br          *branch.Branch // current branch
 	inBlock     bool           // true while in blockQuote
 	isHighLited bool           // true when text is high ligted
+	isQuoted    bool           // true is the lines are precoded quotes
 	sCount      int            // string number
 	root        *branch.Branch // root branch
 }
@@ -78,21 +79,36 @@ func (ht *HTMLTree) Build(s string) error {
 			return ht.HighLite(s)
 
 		case ht.isHighLited:
+			// Pre coded text
 			ht.br.Add(-1, html.EscapeString(raw))
 
+		case l > 4 && indnt >= 4 && (ht.br.ID == "p" || ht.isQuoted):
+			// pre coded quote
+			err = ht.Quote(html.EscapeString(raw))
+
 		case s[0] == '>':
-			// block quote
+			// block Quote
 			err = ht.BlockQuote(Inline(s))
 
 		default:
-			if ht.inBlock {
+			switch {
+			case ht.inBlock:
 				ht.inBlock = false
 				err = ht.TryParent(1)
 				if err != nil {
 					return err
 				}
 				ht.br, _ = ht.br.AddBranch(-1, "p")
+
+			case ht.isQuoted:
+				err = ht.TryParent(2)
+				if err != nil {
+					return err
+				}
+				ht.isQuoted = false
+				ht.br, _ = ht.br.AddBranch(-1, "p")
 			}
+
 			ht.br.Add(-1, Inline(s))
 		}
 	} else {
@@ -151,7 +167,7 @@ func NewHTMLTree(s string) HTMLTree {
 	return ht
 }
 
-//
+// HighLite highlites the text 's'.
 func (ht *HTMLTree) HighLite(s string) error {
 	var err error
 	// Syntactic hightlighting starts or ends
@@ -170,6 +186,17 @@ func (ht *HTMLTree) HighLite(s string) error {
 		}
 		ht.br, _ = ht.br.AddBranch(-1, "p")
 	}
+	return nil
+}
+
+// Quote makes the lines show up as pre coded text 's'.
+func (ht *HTMLTree) Quote(line string) error {
+	if ht.br.ID == "p" {
+		ht.br, _ = ht.br.AddBranch(-1, "pre")
+		ht.br, _ = ht.br.AddBranch(-1, "code")
+		ht.isQuoted = true
+	}
+	ht.br.Add(-1, html.EscapeString(line[4:]))
 	return nil
 }
 
