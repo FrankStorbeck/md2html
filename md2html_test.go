@@ -127,11 +127,11 @@ func TestBuild(t *testing.T) {
 
 		// Quoting
 		{s: []string{"> quote"},
-			want: "r{blockquote{quote}}"},
+			want: "r{blockquote{quote }}"},
 		{s: []string{"aa", "> quote1", "> quote2", "bb"},
-			want: "r{p{aa} blockquote{quote1 quote2} p{bb}}"},
+			want: "r{p{aa} blockquote{quote1  quote2 } p{bb}}"},
 		{s: []string{"aa", "> quote1", "", "> quote2", "bb"},
-			want: "r{p{aa} blockquote{quote1 <br> quote2} p{bb}}"},
+			want: "r{p{aa} blockquote{quote1  <br> quote2 } p{bb}}"},
 	}
 	for _, tst := range tests {
 		ht := NewHTMLTree("r")

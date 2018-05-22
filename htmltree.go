@@ -42,7 +42,7 @@ func (ht *HTMLTree) BlockQuote(s string) error {
 	ht.inBlock = true
 
 	if len(s) > 1 {
-		ht.br.Add(-1, strings.TrimSpace(s[1:]))
+		ht.br.Add(-1, strings.TrimSpace(s[1:])+" ")
 	}
 
 	return nil
@@ -52,6 +52,8 @@ func (ht *HTMLTree) BlockQuote(s string) error {
 func (ht *HTMLTree) Build(s string) error {
 	var err error
 	ht.sCount++
+	indnt := CountLeading(s, ' ', -1)
+	s = strings.Repeat(" ", indnt) + strings.TrimSpace(s)
 	leadingHash := CountLeading(s, '#', 6)
 
 	if l := len(s); l > 0 {
@@ -70,7 +72,7 @@ func (ht *HTMLTree) Build(s string) error {
 
 		case s[0] == '>':
 			// block quote
-			err = ht.BlockQuote(s)
+			err = ht.BlockQuote(StrongEmDel(s))
 
 		default:
 			if ht.inBlock {
@@ -81,12 +83,16 @@ func (ht *HTMLTree) Build(s string) error {
 				}
 				ht.br, _ = ht.br.AddBranch(-1, "p")
 			}
-			ht.br.Add(-1, s)
+			ht.br.Add(-1, StrongEmDel(s))
 		}
 	} else {
+		// empty line
 		switch {
 		case ht.inBlock:
 			ht.br.Add(-1, "<br>")
+
+		case ht.br.ID == "p":
+			ht.br, _ = ht.br.AddBranch(-1, "p")
 
 		default:
 		}
