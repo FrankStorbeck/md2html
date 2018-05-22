@@ -24,5 +24,16 @@ normal ~~deleted~~ normal
 ##Quoting inline code
 Here is some `inline` code.
 
+##Quoting code
+```
+multi
+line
+code
+```
+or
+    multi
+    line
+    code
+
 ##Links
 Can also link to images: ![an image](img/img.png).

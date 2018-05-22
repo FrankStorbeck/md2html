@@ -12,6 +12,7 @@ package main
 
 import (
 	"fmt"
+	"html"
 	"strings"
 
 	"source.storbeck.nl/md2html/branch"
@@ -20,10 +21,11 @@ import (
 // HTMLTree is a struct for holding the data for the construction of a HTML
 // tree.
 type HTMLTree struct {
-	br      *branch.Branch // current branch
-	inBlock bool           // true while in blockQuote
-	sCount  int            // string number
-	root    *branch.Branch // root branch
+	br          *branch.Branch // current branch
+	inBlock     bool           // true while in blockQuote
+	isHighLited bool           // true when text is high ligted
+	sCount      int            // string number
+	root        *branch.Branch // root branch
 }
 
 // BlockQuote adds string 's' as a block quote. If it isn't a continuation of
@@ -50,6 +52,7 @@ func (ht *HTMLTree) BlockQuote(s string) error {
 
 // Build reconstructs the HTML tree based on the contents of 's'.
 func (ht *HTMLTree) Build(s string) error {
+	raw := s
 	var err error
 	ht.sCount++
 	indnt := CountLeading(s, ' ', -1)
@@ -69,6 +72,13 @@ func (ht *HTMLTree) Build(s string) error {
 		case leadingHash > 0:
 			// <h'leadingHash'> line
 			ht.Header(s[leadingHash:], leadingHash)
+
+		case l >= 3 && s[:3] == "```":
+			// Syntactic hightlighting starts or ends
+			return ht.HighLite(s)
+
+		case ht.isHighLited:
+			ht.br.Add(-1, html.EscapeString(raw))
 
 		case s[0] == '>':
 			// block quote
@@ -139,6 +149,28 @@ func NewHTMLTree(s string) HTMLTree {
 	}
 	ht.br = ht.root
 	return ht
+}
+
+//
+func (ht *HTMLTree) HighLite(s string) error {
+	var err error
+	// Syntactic hightlighting starts or ends
+	ht.isHighLited = !ht.isHighLited
+	if ht.isHighLited { // starts
+		err = ht.TryParent(1)
+		if err != nil {
+			return err
+		}
+		ht.br, _ = ht.br.AddBranch(-1, "pre")
+		ht.br, _ = ht.br.AddBranch(-1, "code")
+	} else {
+		err = ht.TryParent(2)
+		if err != nil {
+			return err
+		}
+		ht.br, _ = ht.br.AddBranch(-1, "p")
+	}
+	return nil
 }
 
 // RmIfEmpty removes the branch 'brnch' if it is empty.
