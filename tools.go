@@ -48,6 +48,31 @@ func CountLeading(s string, rn rune, m int) int {
 	return 0
 }
 
+// Images translates mark down image definitions to their html equivalents
+func Images(s string) string {
+	r := s
+	l := len(r)
+	if i := strings.Index(r, "!["); i >= 0 && l > i+5 {
+		if j := strings.Index(r[i:], "]"); j > 0 && l > (i+j+2) {
+			if r[i+j+1] == '(' {
+				if k := strings.Index(r[i+j+1:], ")"); k > 0 {
+					r = r[:i] + "<img src=\"" + r[i+j+2:i+j+k+1] + "\" alt=\"" +
+						r[i+2:i+j] + "\">" + Images(r[i+j+k+2:])
+				}
+			}
+		}
+	}
+	return r
+}
+
+// Inline translates all inline mark down definitions
+// to their html equivalents
+func Inline(s string) string {
+	s = StrongEmDel(s)
+	s = Images(s)
+	return s
+}
+
 // StrongEmDel translates mark down strong, emphasis and deleted definitions
 // to their html equivalents
 func StrongEmDel(s string) string {
@@ -64,33 +89,33 @@ func StrongEmDel(s string) string {
 	for i, tg := range tgs {
 		seps[i] = tg.sep[0][0]
 	}
-	rslt := UniCode(s, seps)
+	r := UniCode(s, seps)
 
 	for _, t := range tgs {
 		for _, sp := range t.sep {
 			var subs []string
 			switch {
 			// special case: "^\*[^\*]+.*$" will become an unordered list, no italics!
-			case sp == "*" && len(rslt) > 0 && rslt[:1] == sp:
-				subs = strings.Split(rslt[1:], sp)
-				rslt = sp + subs[0]
+			case sp == "*" && len(r) > 0 && r[:1] == sp:
+				subs = strings.Split(r[1:], sp)
+				r = sp + subs[0]
 			default:
-				subs = strings.Split(rslt, sp)
-				rslt = subs[0]
+				subs = strings.Split(r, sp)
+				r = subs[0]
 			}
 			n := len(subs)
 			for i := 1; i < n; i = i + 2 {
 				if i+1 < n {
-					rslt = rslt + "<" + t.tg + ">" + subs[i] + "</" + t.tg + ">" +
+					r = r + "<" + t.tg + ">" + subs[i] + "</" + t.tg + ">" +
 						subs[i+1]
 				} else {
-					rslt = rslt + sp + subs[i]
+					r = r + sp + subs[i]
 				}
 			}
 		}
 	}
 
-	return UnEscape(rslt, seps)
+	return UnEscape(r, seps)
 }
 
 // UnEscape replaces unicode by its (non escaped) character.

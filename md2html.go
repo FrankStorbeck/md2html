@@ -89,7 +89,7 @@ func HTMLCode(br *branch.Branch) string {
 	}
 
 	switch br.ID {
-	case "meta", "link":
+	case "link", "meta":
 
 	default:
 		s = s + nl + "</" + br.ID + ">"

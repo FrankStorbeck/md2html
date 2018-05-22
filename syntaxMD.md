@@ -20,3 +20,6 @@ normal ~~deleted~~ normal
 ##Quoting text
 > quote 1
 >quote 2
+
+##Links
+Can also link to images: ![an image](img/img.png).

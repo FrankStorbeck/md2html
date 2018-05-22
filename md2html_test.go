@@ -151,3 +151,20 @@ func TestBuild(t *testing.T) {
 		}
 	}
 }
+
+func TestImages(t *testing.T) {
+	tests := []struct {
+		s    string
+		want string
+	}{
+		{s: "aa ![img](link) bb", want: "aa <img src=\"link\" alt=\"img\"> bb"},
+		{s: "![im1](lin1)![im2](lin2)", want: "<img src=\"lin1\" alt=\"im1\"><img src=\"lin2\" alt=\"im2\">"},
+	}
+
+	for _, tst := range tests {
+		got := Images(tst.s)
+		if got != tst.want {
+			t.Errorf("Images(%q) generates: %q, should be %q", tst.s, got, tst.want)
+		}
+	}
+}

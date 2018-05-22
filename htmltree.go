@@ -72,7 +72,7 @@ func (ht *HTMLTree) Build(s string) error {
 
 		case s[0] == '>':
 			// block quote
-			err = ht.BlockQuote(StrongEmDel(s))
+			err = ht.BlockQuote(Inline(s))
 
 		default:
 			if ht.inBlock {
@@ -83,7 +83,7 @@ func (ht *HTMLTree) Build(s string) error {
 				}
 				ht.br, _ = ht.br.AddBranch(-1, "p")
 			}
-			ht.br.Add(-1, StrongEmDel(s))
+			ht.br.Add(-1, Inline(s))
 		}
 	} else {
 		// empty line
