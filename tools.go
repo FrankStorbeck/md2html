@@ -13,6 +13,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"html"
 	"strings"
 )
 
@@ -50,19 +51,18 @@ func CountLeading(s string, rn rune, m int) int {
 
 // Images translates mark down image definitions to their html equivalents
 func Images(s string) string {
-	r := s
-	l := len(r)
-	if i := strings.Index(r, "!["); i >= 0 && l > i+5 {
-		if j := strings.Index(r[i:], "]"); j > 0 && l > (i+j+2) {
-			if r[i+j+1] == '(' {
-				if k := strings.Index(r[i+j+1:], ")"); k > 0 {
-					r = r[:i] + "<img src=\"" + r[i+j+2:i+j+k+1] + "\" alt=\"" +
-						r[i+2:i+j] + "\">" + Images(r[i+j+k+2:])
+	l := len(s)
+	if i := strings.Index(s, "!["); i >= 0 && l > i+5 {
+		if j := strings.Index(s[i:], "]"); j > 0 && l > (i+j+2) {
+			if s[i+j+1] == '(' {
+				if k := strings.Index(s[i+j+1:], ")"); k > 0 {
+					s = s[:i] + "<img src=\"" + s[i+j+2:i+j+k+1] + "\" alt=\"" +
+						s[i+2:i+j] + "\">" + Images(s[i+j+k+2:])
 				}
 			}
 		}
 	}
-	return r
+	return s
 }
 
 // Inline translates all inline mark down definitions
@@ -70,6 +70,19 @@ func Images(s string) string {
 func Inline(s string) string {
 	s = StrongEmDel(s)
 	s = Images(s)
+	s = InlineCodes(s)
+	return s
+}
+
+// InlineCodes translates mark down code definitions to their html equivalents
+func InlineCodes(s string) string {
+	l := len(s)
+	if i := strings.Index(s, "`"); i >= 0 && l > i+2 {
+		if j := strings.Index(s[i+1:], "`"); j > 0 {
+			s = s[:i] + "<code>" + html.EscapeString(s[i+1:i+j+1]) +
+				"</code>" + InlineCodes(s[i+j+2:])
+		}
+	}
 	return s
 }
 
@@ -89,33 +102,33 @@ func StrongEmDel(s string) string {
 	for i, tg := range tgs {
 		seps[i] = tg.sep[0][0]
 	}
-	r := UniCode(s, seps)
+	s = UniCode(s, seps)
 
 	for _, t := range tgs {
 		for _, sp := range t.sep {
 			var subs []string
 			switch {
 			// special case: "^\*[^\*]+.*$" will become an unordered list, no italics!
-			case sp == "*" && len(r) > 0 && r[:1] == sp:
-				subs = strings.Split(r[1:], sp)
-				r = sp + subs[0]
+			case sp == "*" && len(s) > 0 && s[:1] == sp:
+				subs = strings.Split(s[1:], sp)
+				s = sp + subs[0]
 			default:
-				subs = strings.Split(r, sp)
-				r = subs[0]
+				subs = strings.Split(s, sp)
+				s = subs[0]
 			}
 			n := len(subs)
 			for i := 1; i < n; i = i + 2 {
 				if i+1 < n {
-					r = r + "<" + t.tg + ">" + subs[i] + "</" + t.tg + ">" +
+					s = s + "<" + t.tg + ">" + subs[i] + "</" + t.tg + ">" +
 						subs[i+1]
 				} else {
-					r = r + sp + subs[i]
+					s = s + sp + subs[i]
 				}
 			}
 		}
 	}
 
-	return UnEscape(r, seps)
+	return UnEscape(s, seps)
 }
 
 // UnEscape replaces unicode by its (non escaped) character.

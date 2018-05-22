@@ -168,3 +168,19 @@ func TestImages(t *testing.T) {
 		}
 	}
 }
+
+func TestInlineCodes(t *testing.T) {
+	tests := []struct {
+		s    string
+		want string
+	}{
+		{s: "aa `code` bb", want: "aa <code>code</code> bb"},
+	}
+
+	for _, tst := range tests {
+		got := InlineCodes(tst.s)
+		if got != tst.want {
+			t.Errorf("InlineCodes(%q) generates: %q, should be %q", tst.s, got, tst.want)
+		}
+	}
+}
