@@ -70,6 +70,7 @@ func Images(s string) string {
 func Inline(s string) string {
 	s = StrongEmDel(s)
 	s = Images(s)
+	s = Links(s) // always after Images(s)!
 	s = InlineCodes(s)
 	return s
 }
@@ -81,6 +82,22 @@ func InlineCodes(s string) string {
 		if j := strings.Index(s[i+1:], "`"); j > 0 {
 			s = s[:i] + "<code>" + html.EscapeString(s[i+1:i+j+1]) +
 				"</code>" + InlineCodes(s[i+j+2:])
+		}
+	}
+	return s
+}
+
+// Links translates mark down link definitions to their html equivalents
+func Links(s string) string {
+	l := len(s)
+	if i := strings.Index(s, "["); i >= 0 && l > i+4 {
+		if j := strings.Index(s[i:], "]"); j > 0 && l > (i+j+1) {
+			if s[i+j+1] == '(' {
+				if k := strings.Index(s[i+j+1:], ")"); k > 0 {
+					s = s[:i] + "<a href=\"" + s[i+j+2:i+j+k+1] + "\">" + s[i+1:i+j] +
+						"</a>" + Links(s[i+j+k+2:])
+				}
+			}
 		}
 	}
 	return s

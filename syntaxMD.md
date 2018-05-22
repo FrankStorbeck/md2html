@@ -36,4 +36,8 @@ or
     code
 
 ##Links
+Link to [something](https://guides.github.com/features/mastering-markdown/),
+
+or to something [local](doc/README.md).
+
 Can also link to images: ![an image](img/img.png).

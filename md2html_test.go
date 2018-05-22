@@ -186,3 +186,20 @@ func TestInlineCodes(t *testing.T) {
 		}
 	}
 }
+
+func TestLinks(t *testing.T) {
+	tests := []struct {
+		s    string
+		want string
+	}{
+		{s: "aa [txt](link) bb", want: "aa <a href=\"link\">txt</a> bb"},
+		{s: "[t1](l1)[t2](l2)", want: "<a href=\"l1\">t1</a><a href=\"l2\">t2</a>"},
+	}
+
+	for _, tst := range tests {
+		got := Links(tst.s)
+		if got != tst.want {
+			t.Errorf("Links(%q) generates: %q, should be %q", tst.s, got, tst.want)
+		}
+	}
+}
