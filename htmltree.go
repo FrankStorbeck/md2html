@@ -23,6 +23,8 @@ import (
 type HTMLTree struct {
 	br          *branch.Branch // current branch
 	inBlock     bool           // true while in blockQuote
+	indents     []int          // positions for indents for lists items
+	inList      bool           // true when in some (un)ordered list
 	isHighLited bool           // true when text is high ligted
 	isQuoted    bool           // true is the lines are precoded quotes
 	sCount      int            // string number
@@ -90,6 +92,24 @@ func (ht *HTMLTree) Build(s string) error {
 			// block Quote
 			err = ht.BlockQuote(Inline(s))
 
+		case l > indnt && (s[indnt] == '*' || s[indnt] == '-' || s[indnt] == '+'):
+			// new unordered list item
+			err = ht.ListItem(s, indnt)
+
+		case ht.inList && indnt > ht.indents[0]:
+			l := len(ht.indents)
+			n := IndentIndex(indnt, ht.indents)
+			if n < l-1 {
+				err = ht.ListParent(l - 1 - n)
+				if err != nil {
+					ht.inList = false
+					ht.br = ht.root
+				} else {
+					ht.indents = ht.indents[:n+2]
+				}
+			}
+			ht.br.Add(-1, Inline(s[indnt:]))
+
 		default:
 			switch {
 			case ht.inBlock:
@@ -107,6 +127,11 @@ func (ht *HTMLTree) Build(s string) error {
 				}
 				ht.isQuoted = false
 				ht.br, _ = ht.br.AddBranch(-1, "p")
+
+			case ht.inList:
+				ht.inList = false
+				ht.br, _ = ht.root.AddBranch(-1, "p")
+				s = s[indnt:]
 			}
 
 			ht.br.Add(-1, Inline(s))
@@ -116,6 +141,17 @@ func (ht *HTMLTree) Build(s string) error {
 		switch {
 		case ht.inBlock:
 			ht.br.Add(-1, "<br>")
+
+		case ht.inList:
+			// in a list when there is a blank line, siblings are put into a paragraph
+			if ht.br.ID == "li" {
+				sblngs := ht.br.Siblings()
+				ht.br.RemoveAll()
+				ht.br, _ = ht.br.AddBranch(-1, "p")
+				for _, s := range sblngs {
+					ht.br.Add(-1, s)
+				}
+			}
 
 		case ht.br.ID == "p":
 			ht.br, _ = ht.br.AddBranch(-1, "p")
@@ -185,6 +221,80 @@ func (ht *HTMLTree) HighLite(s string) error {
 			return err
 		}
 		ht.br, _ = ht.br.AddBranch(-1, "p")
+	}
+	return nil
+}
+
+// IndentIndex returns the index of the first element in 'indents' for which
+// the value is larger or equal to 'n'
+func IndentIndex(n int, indents []int) int {
+	l := len(indents) - 1
+	i := 0
+	for i <= l && n > indents[i] {
+		i++
+	}
+	return i
+}
+
+// ListItem inserts a unordered list item.
+func (ht *HTMLTree) ListItem(s string, indnt int) error {
+	err := ht.TryParent(1)
+	if err != nil {
+		return err
+	}
+	if ht.br.ID == "li" {
+		// might be stil at '...ul{li{}}' 'ListItem' started at '...ul{li{p{...}}}'
+		err = ht.TryParent(1)
+		if err != nil {
+			return err
+		}
+	}
+
+	// nIndents holds the actual indents found so far; nIndents+1 hold the
+	// position for an upcoming new indent.
+	nIndents := len(ht.indents) - 1
+	if !ht.inList || nIndents < 0 {
+		ht.indents = []int{indnt}
+		nIndents = 0
+		ht.inList = true
+	}
+
+	n := IndentIndex(indnt, ht.indents)
+	switch {
+	case n >= nIndents:
+		// start a new indent level
+		indntInc := CountLeading(s[indnt+1:], ' ', -1)
+		ht.indents = append(ht.indents, indnt+indntInc+1)
+		ht.br, _ = ht.br.AddBranch(-1, "ul")
+
+	case n == nIndents-1:
+		// continuation of current indent level
+
+	default:
+		// use older indent level
+		err = ht.ListParent(nIndents - n - 1)
+		if err != nil {
+			return err
+		}
+		ht.indents = ht.indents[:n+2]
+	}
+
+	ht.br, _ = ht.br.AddBranch(-1, "li")
+	ht.br.Add(-1, strings.TrimSpace(s[indnt+1:]))
+
+	return nil
+}
+
+// ListParent set the current branch to the 'n'-th parent that is a 'ul{..}'
+func (ht *HTMLTree) ListParent(n int) error {
+	for n > 0 {
+		if ht.br.ID == "ul" {
+			n--
+		}
+		err := ht.TryParent(1)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }

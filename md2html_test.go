@@ -134,6 +134,16 @@ func TestBuild(t *testing.T) {
 			want: "r{p{aa} blockquote{quote1  <br> quote2 } p{bb}}"},
 		{s: []string{"aa`cc`bb"}, want: "r{p{aa<code>cc</code>bb}}"},
 		{s: []string{"aa", "```", "a1", "a2", "```", "bb"}, want: "r{p{aa} pre{code{a1 a2}} p{bb}}"},
+
+		// Lists
+		{s: []string{"aa", "* 1", "* 2", "  + 2.1", "  + 2.2", "    - 2.2.1", "  + 2.3", "* 3", "cc"},
+			want: "r{p{aa} ul{li{1} li{2} ul{li{2.1} li{2.2} ul{li{2.2.1}} li{2.3}} li{3}} p{cc}}"},
+		{s: []string{"aa", "  * 1", "   l1", "  * 2", "   l2", "c"},
+			want: "r{p{aa} ul{li{1 l1} li{2 l2}} p{c}}"},
+		{s: []string{"* 1", "* 2", "a", "* p", "* q"},
+			want: "r{ul{li{1} li{2}} p{a} ul{li{p} li{q}}}"},
+		{s: []string{"a", "* 1", "* 2", "  + a", "* 3", "", "  b", " c", "* 4", "d"},
+			want: "r{p{a} ul{li{1} li{2} ul{li{a}} li{p{3 b c}} li{4}} p{d}}"},
 	}
 	for _, tst := range tests {
 		ht := NewHTMLTree("r")
