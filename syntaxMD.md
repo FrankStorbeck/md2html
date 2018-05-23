@@ -64,7 +64,7 @@ Can also link to images: ![an image](img/img.png).
     * Unordered list item 3.2.2
   - Unorderd list item 3.3
     * Unorderd list item 3.3.1
-* Unorderd list item 4
+* Unordered list item 4
 
 ###Ordered
 1. Ordered list item 1
@@ -72,22 +72,3 @@ Can also link to images: ![an image](img/img.png).
 3. Ordered list item 3
    1. Ordered list item 3.1
    2. Ordered list item 3.2
-
-###Mixed ordered and unordered
-* Unordered list item 1
-* Unordered list item 2
-* Unordered list item 3
-  3. Ordered list item 3.1
-  3. Ordered list item 3.2
-     * Unordered list item 3.2.1
-     * Unordered list item 3.2.2
-  3. Orderd list item 3.3
-     * Unorderd list item 3.3.1
-* Unorderd list item 4
-
-##Organizing information with tables
-| AAA | NNN  | MMMMM | WWWWWWW |
-| --- | :--- | ----: | :-----: |
-| aaa | nnn  | mmmmm | \|wwwwww |
-| zzz |
-| 000 | 111  | 22222 | 3333333 | 44444 |

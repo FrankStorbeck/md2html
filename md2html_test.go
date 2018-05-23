@@ -144,6 +144,10 @@ func TestBuild(t *testing.T) {
 			want: "r{ul{li{1} li{2}} p{a} ul{li{p} li{q}}}"},
 		{s: []string{"a", "* 1", "* 2", "  + a", "* 3", "", "  b", " c", "* 4", "d"},
 			want: "r{p{a} ul{li{1} li{2} ul{li{a}} li{p{3 b c}} li{4}} p{d}}"},
+		{s: []string{"aa", "1. 1", "2. 2", "   2. 2.1", "   2. 2.2", "cc"},
+			want: "r{p{aa} ol{li{1} li{2} ol{li{2.1} li{2.2}}} p{cc}}"},
+		{s: []string{"aa", "1. 1", "2. 2", "   - 2.1", "   - 2.2", "cc"},
+			want: "r{p{aa} ol{li{1} li{2} ul{li{2.1} li{2.2}}} p{cc}}"},
 	}
 	for _, tst := range tests {
 		ht := NewHTMLTree("r")

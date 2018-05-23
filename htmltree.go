@@ -13,6 +13,7 @@ package main
 import (
 	"fmt"
 	"html"
+	"strconv"
 	"strings"
 
 	"source.storbeck.nl/md2html/branch"
@@ -62,6 +63,14 @@ func (ht *HTMLTree) Build(s string) error {
 	s = strings.Repeat(" ", indnt) + strings.TrimSpace(s)
 	leadingHash := CountLeading(s, '#', 6)
 
+	nEnd := strings.Index(s[indnt:], ".") // end of number for ordered list
+	if nEnd > 0 {
+		_, err = strconv.Atoi(s[indnt : indnt+nEnd])
+		if err != nil {
+			nEnd = 0
+		}
+	}
+
 	if l := len(s); l > 0 {
 		switch {
 		case OnlyRunes(s, '='):
@@ -94,7 +103,11 @@ func (ht *HTMLTree) Build(s string) error {
 
 		case l > indnt && (s[indnt] == '*' || s[indnt] == '-' || s[indnt] == '+'):
 			// new unordered list item
-			err = ht.ListItem(s, indnt)
+			fallthrough
+
+		case nEnd > 0:
+			// new ordered list item
+			err = ht.ListItem(s, indnt, nEnd)
 
 		case ht.inList && indnt > ht.indents[0]:
 			l := len(ht.indents)
@@ -102,8 +115,7 @@ func (ht *HTMLTree) Build(s string) error {
 			if n < l-1 {
 				err = ht.ListParent(l - 1 - n)
 				if err != nil {
-					ht.inList = false
-					ht.br = ht.root
+					ht.Reset()
 				} else {
 					ht.indents = ht.indents[:n+2]
 				}
@@ -129,8 +141,7 @@ func (ht *HTMLTree) Build(s string) error {
 				ht.br, _ = ht.br.AddBranch(-1, "p")
 
 			case ht.inList:
-				ht.inList = false
-				ht.br, _ = ht.root.AddBranch(-1, "p")
+				ht.Reset()
 				s = s[indnt:]
 			}
 
@@ -191,7 +202,7 @@ func (ht *HTMLTree) Header(line string, n int) {
 	ht.RmIfEmpty(b)
 	ht.br, _ = ht.br.AddBranch(-1, fmt.Sprintf("h%d", n))
 	ht.br.Add(-1, strings.TrimSpace(line))
-	ht.br, _ = ht.root.AddBranch(-1, "p")
+	ht.Reset()
 }
 
 // NewHTMLTree returns a pointer to a new HTMLTree struct.
@@ -237,11 +248,15 @@ func IndentIndex(n int, indents []int) int {
 }
 
 // ListItem inserts a unordered list item.
-func (ht *HTMLTree) ListItem(s string, indnt int) error {
+func (ht *HTMLTree) ListItem(s string, indnt, nEnd int) error {
+	if nEnd < 0 {
+		nEnd = 0
+	}
 	err := ht.TryParent(1)
 	if err != nil {
 		return err
 	}
+
 	if ht.br.ID == "li" {
 		// might be stil at '...ul{li{}}' 'ListItem' started at '...ul{li{p{...}}}'
 		err = ht.TryParent(1)
@@ -263,9 +278,13 @@ func (ht *HTMLTree) ListItem(s string, indnt int) error {
 	switch {
 	case n >= nIndents:
 		// start a new indent level
-		indntInc := CountLeading(s[indnt+1:], ' ', -1)
-		ht.indents = append(ht.indents, indnt+indntInc+1)
-		ht.br, _ = ht.br.AddBranch(-1, "ul")
+		inc := nEnd + CountLeading(s[indnt+nEnd+1:], ' ', -1)
+		ht.indents = append(ht.indents, indnt+inc+1)
+		tg := "ul"
+		if nEnd > 0 {
+			tg = "ol"
+		}
+		ht.br, _ = ht.br.AddBranch(-1, tg)
 
 	case n == nIndents-1:
 		// continuation of current indent level
@@ -280,7 +299,7 @@ func (ht *HTMLTree) ListItem(s string, indnt int) error {
 	}
 
 	ht.br, _ = ht.br.AddBranch(-1, "li")
-	ht.br.Add(-1, strings.TrimSpace(s[indnt+1:]))
+	ht.br.Add(-1, strings.TrimSpace(s[indnt+nEnd+1:]))
 
 	return nil
 }
@@ -310,6 +329,14 @@ func (ht *HTMLTree) Quote(line string) error {
 	return nil
 }
 
+// Reset resets the current tree to a new paragraph in 'root'
+func (ht *HTMLTree) Reset() {
+	ht.inList = false
+	ht.inBlock = false
+	ht.br = ht.root
+	ht.br, _ = ht.root.AddBranch(-1, "p")
+}
+
 // RmIfEmpty removes the branch 'brnch' if it is empty.
 func (ht *HTMLTree) RmIfEmpty(brnch *branch.Branch) error {
 	if brnch != ht.root && brnch.Len() <= 0 {
@@ -325,7 +352,7 @@ func (ht *HTMLTree) RmIfEmpty(brnch *branch.Branch) error {
 func (ht *HTMLTree) TryParent(n int) error {
 	var err error
 	if ht.br == nil {
-		ht.br = ht.root
+		ht.Reset()
 		return nil
 	}
 	for n > 0 {
