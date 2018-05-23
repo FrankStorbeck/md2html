@@ -148,6 +148,14 @@ func TestBuild(t *testing.T) {
 			want: "r{p{aa} ol{li{1} li{2} ol{li{2.1} li{2.2}}} p{cc}}"},
 		{s: []string{"aa", "1. 1", "2. 2", "   - 2.1", "   - 2.2", "cc"},
 			want: "r{p{aa} ol{li{1} li{2} ul{li{2.1} li{2.2}}} p{cc}}"},
+
+		// Tables
+		{s: []string{"s", "| A | B |", "| --- | --- |", "| a | b |", "", "e"},
+			want: "r{p{s table:style=\"width: 100%\"{tr{th{A} th{B}} tr{td{a} td{b}}} e}}"},
+		{s: []string{"s", "| A | B |", "|| --- |  | --- ||", "| a | b |", "", "e"},
+			want: "r{p{s table:style=\"width: 100%\"{tr{th{A} th{B}} tr{td{a} td{b}}} e}}"},
+		{s: []string{"s", "| A | B | C | D |", "| --- | :--- | ---: | :---: |", "| a | b | c | d |", "e"},
+			want: "r{p{s table:style=\"width: 100%\"{tr{th{A} th:style=\"text-align: left\"{B} th:style=\"text-align: right\"{C} th:style=\"text-align: center\"{D}} tr{td{a} td:style=\"text-align: left\"{b} td:style=\"text-align: right\"{c} td:style=\"text-align: center\"{d}}} e}}"},
 	}
 	for _, tst := range tests {
 		ht := NewHTMLTree("r")
@@ -162,7 +170,7 @@ func TestBuild(t *testing.T) {
 
 		got := ht.root.String()
 		if got != tst.want {
-			t.Errorf("Build(%q)... generates %q, should be %q",
+			t.Errorf("Build(%q)... generates:\n %q\n, should be:\n %q\n",
 				tst.s[0], got, tst.want)
 		}
 	}

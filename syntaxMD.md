@@ -72,3 +72,10 @@ Can also link to images: ![an image](img/img.png).
 3. Ordered list item 3
    1. Ordered list item 3.1
    2. Ordered list item 3.2
+
+##Organizing information with tables
+| AAA | NNN  | MMMMM | WWWWWWW |
+| --- | :--- | ----: | :-----: |
+| aaa | nnn  | mmmmm | \|wwwwww |
+| zzz |
+| 000 | 111  | 22222 | 3333333 | 44444 |

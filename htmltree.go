@@ -19,6 +19,9 @@ import (
 	"source.storbeck.nl/md2html/branch"
 )
 
+// TableInfo holds table data.
+type TableInfo []int
+
 // HTMLTree is a struct for holding the data for the construction of a HTML
 // tree.
 type HTMLTree struct {
@@ -30,7 +33,16 @@ type HTMLTree struct {
 	isQuoted    bool           // true is the lines are precoded quotes
 	sCount      int            // string number
 	root        *branch.Branch // root branch
+	tblInfo     TableInfo      // table information
+
 }
+
+const (
+	noAlign = iota
+	left
+	right
+	center
+)
 
 // BlockQuote adds string 's' as a block quote. If it isn't a continuation of
 // a bock quote, it will be initialized.
@@ -72,6 +84,12 @@ func (ht *HTMLTree) Build(s string) error {
 	}
 
 	if l := len(s); l > 0 {
+		newTblInfo := TableInfo{}
+		if len(ht.tblInfo) <= 0 {
+			// can be a new table
+			newTblInfo = CountTblColls(s)
+		}
+
 		switch {
 		case OnlyRunes(s, '='):
 			// previous line was a <h1> line
@@ -122,6 +140,14 @@ func (ht *HTMLTree) Build(s string) error {
 			}
 			ht.br.Add(-1, Inline(s[indnt:]))
 
+		case len(ht.tblInfo) > 0:
+			// table row?
+			err = ht.TblRow(s, false)
+
+		case len(newTblInfo) > 0:
+			// previous line was a table header row
+			err = ht.ChangePrevToTblHdr(s, &newTblInfo)
+
 		default:
 			switch {
 			case ht.inBlock:
@@ -150,6 +176,11 @@ func (ht *HTMLTree) Build(s string) error {
 	} else {
 		// empty line
 		switch {
+		case len(ht.tblInfo) > 0:
+			// end of table
+			err = ht.TryParent(1)
+			ht.tblInfo = TableInfo{}
+
 		case ht.inBlock:
 			ht.br.Add(-1, "<br>")
 
@@ -193,6 +224,84 @@ func (ht *HTMLTree) ChangePrevToHdr(s string) {
 			ht.br.Add(-1, prev) // restore 'prev'
 		}
 	}
+}
+
+// ChangePrevToTblHdr changes the string that was added just before into a table
+// header.
+func (ht *HTMLTree) ChangePrevToTblHdr(s string, newTblInfo *TableInfo) error {
+	ht.tblInfo = *newTblInfo
+	ln, err := ht.br.Remove(-1)
+	if err != nil {
+		return err
+	}
+
+	s, ok := ln.(string)
+	if ok { // 'ln' must be a string
+		// ht.br, _ = ht.br.Parent(1)
+		ht.br, _ = ht.br.AddBranch(-1, "table")
+		ht.br.Info = "style=\"width: 100%\""
+		b := TRow(s, true, &(ht.tblInfo))
+		if b != nil {
+			ht.br.Add(-1, b)
+		} else {
+			err = ht.TryParent(1)
+			if err != nil {
+				return err
+			}
+			ht.br.Add(-1, s)
+			ht.tblInfo = TableInfo{}
+		}
+	} else {
+		// resore 'ln'
+		ht.br.Add(-1, ln)
+	}
+	return nil
+}
+
+// CountTblColls test is a table separator line is found, and if true it
+// analyses the table structure
+func CountTblColls(s string) TableInfo {
+	cols := strings.Split(strings.TrimSpace(s), "|")
+
+	l := len(cols)
+	if l < 3 || len(cols[0]) > 0 || len(cols[l-1]) > 0 {
+		return TableInfo{}
+	}
+
+	tblInfo := make(TableInfo, len(cols)-2)
+	cols = cols[1 : l-1] // trim first and last elements
+
+	for i, c := range cols {
+		c = strings.TrimSpace(c)
+		l := len(c)
+		if l > 0 {
+
+			if c1 := strings.Index(c, ":"); c1 == 0 {
+				if c2 := strings.Index(c[1:], ":"); c2 == l-2 {
+					if !OnlyRunes(c[1:l-1], '-') {
+						return TableInfo{}
+					}
+					tblInfo[i] = center
+				} else {
+					if !OnlyRunes(c[1:], '-') {
+						return TableInfo{}
+					}
+					tblInfo[i] = left
+				}
+			} else if c1 == l-1 {
+				if !OnlyRunes(c[:l-1], '-') {
+					return TableInfo{}
+				}
+				tblInfo[i] = right
+			} else {
+				if !OnlyRunes(c, '-') {
+					return TableInfo{}
+				}
+				// tblInfo[i] = noAlign
+			}
+		}
+	}
+	return tblInfo
 }
 
 // Header adds a header line with level 'n' to the HTML tree.
@@ -346,6 +455,68 @@ func (ht *HTMLTree) RmIfEmpty(brnch *branch.Branch) error {
 		}
 	}
 	return nil
+}
+
+// TblRow adds a table row.
+func (ht *HTMLTree) TblRow(s string, hdr bool) error {
+	var err error
+	b := TRow(s, false, &(ht.tblInfo))
+	if b != nil {
+		ht.br.Add(-1, b)
+	} else {
+		// end of table
+		err = ht.TryParent(1)
+		if err != nil {
+			return err
+		}
+		ht.tblInfo = TableInfo{}
+		ht.br.Add(-1, s)
+	}
+	return nil
+}
+
+// TRow returns a branch holding a table row. If hdr is true, a table header
+// is asumed. tblInfo holds the TableInfo for the table collumns ,
+func TRow(s string, hdr bool, tblInfo *TableInfo) *branch.Branch {
+	cols := strings.Split(strings.TrimSpace(UniCode(s, []byte{'|'})), "|")
+
+	l := len(cols)
+	if l < 3 || len(cols[0]) > 0 || len(cols[l-1]) > 0 {
+		return nil
+	}
+
+	cols = cols[1 : l-1]
+	l = l - 2
+	if l > len(*tblInfo) {
+		l = len(*tblInfo)
+		cols = cols[:l]
+	}
+	rslt := &branch.Branch{ID: "tr"}
+	br := rslt
+
+	tag := "td"
+	if hdr {
+		tag = "th"
+	}
+
+	for i, col := range cols {
+		br, _ = br.AddBranch(-1, tag)
+
+		if (*tblInfo)[i] > 0 {
+			a := "left"
+			switch (*tblInfo)[i] {
+			case right:
+				a = "right"
+			case center:
+				a = "center"
+			}
+			br.Info = fmt.Sprintf("style=\"text-align: %s\"", a)
+		}
+
+		br.Add(-1, strings.TrimSpace(UniCode(col, []byte{'|'})))
+		br, _ = br.Parent(1)
+	}
+	return rslt
 }
 
 // TryParent goes safely to the 'n'-th parent of the current branch.
