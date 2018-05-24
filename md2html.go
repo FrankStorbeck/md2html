@@ -13,25 +13,33 @@ package main
 
 import (
 	"bufio"
+	"flag"
 	"fmt"
 	"io"
+	"log"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"source.storbeck.nl/md2html/branch"
 )
 
+const (
+	// arch0   = flag.Arg(0) //"md2html"
+	kVersion = "0.1"
+)
+
+// Config holds all configuration data
+type Config struct {
+	fIn   *os.File
+	fOut  *os.File
+	style string
+	title string
+}
+
 // BuildHTMLTree returns a pointer to a branch struct with all HTML elements
 // from a named mark down file. In case of an error 'nil' and the error will be
 // returned.
-func BuildHTMLTree(path string) (*branch.Branch, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-
+func BuildHTMLTree(f *os.File) (*branch.Branch, error) {
 	buf := bufio.NewReader(f)
 
 	st := NewHTMLTree("body")
@@ -103,22 +111,87 @@ func HTMLCode(br *branch.Branch) string {
 	return s
 }
 
-func main() {
-	html := NewHTMLTree("html")
-	head, _ := html.br.AddBranch(-1, "head")
-	title, _ := head.AddBranch(-1, "title")
-	title.Add(-1, "some title")
+func Configure() *Config {
+	cfg := new(Config)
+
+	// parse de argumenten
+	version := flag.Bool("version", false, "Show version number and exit")
+	if *version {
+		fmt.Printf("Version %s\n", kVersion)
+		os.Exit(0)
+	}
+
+	input := flag.String("in", "stdin", "path to input file")
+	output := flag.String("out", "stdout", "path to output file")
+	flag.StringVar(&cfg.title, "title", "", "title for HTML document")
+	flag.StringVar(&cfg.style, "style", "", "style sheet for HTML document")
+
+	flag.Parse()
+
+	var err error
+	cfg.fIn = os.Stdin
+	if *input != "stdin" {
+		cfg.fIn, err = os.Open(*input)
+		if err != nil {
+			log.Fatalf("%s", err)
+		}
+	}
+
+	cfg.fOut = os.Stdout
+	if *output != "stdout" {
+		cfg.fOut, err = os.Create(*output)
+		if err != nil {
+			log.Fatalf("%s", err)
+		}
+	}
+
+	return cfg
+}
+
+// Header returns a branch holding HTML head data.
+func (cfg *Config) Header() *branch.Branch {
+	head := branch.NewBranch("head")
+
+	if len(cfg.title) > 0 {
+		title, _ := head.AddBranch(-1, "title")
+		title.Add(-1, cfg.title)
+	}
+
 	meta, _ := head.AddBranch(-1, "meta")
 	meta.Info = "charset=\"utf-8\""
 	meta.Add(-1, "")
 
-	body, err := BuildHTMLTree(filepath.Join(".", "syntaxMD.md"))
-	if err != nil {
-		fmt.Printf("error: %s\n", err)
-		os.Exit(1)
+	meta, _ = head.AddBranch(-1, "meta")
+	meta.Info = "name=\"generator\" content=\"md2html\""
+	meta.Add(-1, "")
+
+	meta, _ = head.AddBranch(-1, "meta")
+	meta.Info = "http-equiv=\"Content-Style-Type\" content=\"text/css\""
+	meta.Add(-1, "")
+
+	if len(cfg.style) > 0 {
+		style, _ := head.AddBranch(-1, "style")
+		style.Info = fmt.Sprintf("rel=\"stylesheet\" href=\"%s\" type=\"text/css\"",
+			cfg.style)
+		style.Add(-1, "")
 	}
 
+	return head
+}
+
+func main() {
+
+	cfg := Configure()
+
+	html := NewHTMLTree("html")
+	html.root.Add(-1, cfg.Header())
+
+	body, err := BuildHTMLTree(cfg.fIn)
+	if err != nil {
+		fmt.Printf("building HTML tree: %s\n", err)
+		os.Exit(1)
+	}
 	html.root.Add(-1, body)
 
-	fmt.Printf("%s", HTMLCode(html.root))
+	fmt.Fprintf(cfg.fOut, "%s", HTMLCode(html.root))
 }
