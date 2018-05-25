@@ -47,7 +47,7 @@ or
     code
 
 ##Links
-Link to [something](https://guides.github.com/features/mastering-markdown/),
+Link to [mastering markdown](https://guides.github.com/features/mastering-markdown/),
 
 or to something [local](doc/README.md).
 

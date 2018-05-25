@@ -27,7 +27,7 @@ func TestStyling(t *testing.T) {
 	for _, tst := range tests {
 		got := StrongEmDel(tst.s)
 		if got != tst.want {
-			t.Errorf("StrongEmDel(%q) generates: %q, should be: %q", tst.s, got, tst.want)
+			t.Errorf("StrongEmDel(%q) generates:\n%q\nshould be:\n%q\n", tst.s, got, tst.want)
 		}
 	}
 }
@@ -45,7 +45,7 @@ func TestUniCode(t *testing.T) {
 	for _, tst := range tests {
 		got := UniCode(tst.s, []byte{'*'})
 		if got != tst.want {
-			t.Errorf("UniCode(%q, []byte{'*'}) generates: %q, should be: %q", tst.s, got, tst.want)
+			t.Errorf("UniCode(%q, []byte{'*'}) generates:\n%q\nshould be:\n%q\n", tst.s, got, tst.want)
 		}
 	}
 }
@@ -63,7 +63,7 @@ func TestUnEscape(t *testing.T) {
 	for _, tst := range tests {
 		got := UnEscape(tst.s, []byte{'*'})
 		if got != tst.want {
-			t.Errorf("UnEscape(%q, []byte{'*'}) generates: %q, should be: %q", tst.s, got, tst.want)
+			t.Errorf("UnEscape(%q, []byte{'*'}) generates:\n%q\nshould be:\n%q\n", tst.s, got, tst.want)
 		}
 	}
 }
@@ -131,7 +131,7 @@ func TestBuild(t *testing.T) {
 		{s: []string{"aa", "> quote1", "> quote2", "bb"},
 			want: "r{p{aa} blockquote{quote1  quote2 } p{bb}}"},
 		{s: []string{"aa", "> quote1", "", "> quote2", "bb"},
-			want: "r{p{aa} blockquote{quote1  <br> quote2 } p{bb}}"},
+			want: "r{p{aa} blockquote{quote1 } blockquote{quote2 } p{bb}}"},
 		{s: []string{"aa`cc`bb"}, want: "r{p{aa<code>cc</code>bb}}"},
 		{s: []string{"aa", "```", "a1", "a2", "```", "bb"}, want: "r{p{aa} pre{code{a1 a2}} p{bb}}"},
 
@@ -140,10 +140,12 @@ func TestBuild(t *testing.T) {
 			want: "r{p{aa} ul{li{1} li{2} ul{li{2.1} li{2.2} ul{li{2.2.1}} li{2.3}} li{3}} p{cc}}"},
 		{s: []string{"aa", "  * 1", "   l1", "  * 2", "   l2", "c"},
 			want: "r{p{aa} ul{li{1 l1} li{2 l2}} p{c}}"},
+		{s: []string{"a", "", "- b", "", "  * c", "", "  d", "", "- e", "", "f"},
+			want: "r{p{a} ul{li{b <p></p>} ul{li{c <p></p>}} p{d <p></p>} li{e <p></p>}} p{f}}"},
 		{s: []string{"* 1", "* 2", "a", "* p", "* q"},
 			want: "r{ul{li{1} li{2}} p{a} ul{li{p} li{q}}}"},
 		{s: []string{"a", "* 1", "* 2", "  + a", "* 3", "", "  b", " c", "* 4", "d"},
-			want: "r{p{a} ul{li{1} li{2} ul{li{a}} li{p{3 b c}} li{4}} p{d}}"},
+			want: "r{p{a} ul{li{1} li{2} ul{li{a}} li{3 <p></p> b c} li{4}} p{d}}"},
 		{s: []string{"aa", "1. 1", "2. 2", "   2. 2.1", "   2. 2.2", "cc"},
 			want: "r{p{aa} ol{li{1} li{2} ol{li{2.1} li{2.2}}} p{cc}}"},
 		{s: []string{"aa", "1. 1", "2. 2", "   - 2.1", "   - 2.2", "cc"},
@@ -170,7 +172,7 @@ func TestBuild(t *testing.T) {
 
 		got := ht.root.String()
 		if got != tst.want {
-			t.Errorf("Build(%q)... generates:\n %q\n, should be:\n %q\n",
+			t.Errorf("Build(%q)... generates:\n%q\nshould be:\n%q\n",
 				tst.s[0], got, tst.want)
 		}
 	}
@@ -181,14 +183,16 @@ func TestImages(t *testing.T) {
 		s    string
 		want string
 	}{
-		{s: "aa ![img](link) bb", want: "aa <img src=\"link\" alt=\"img\"> bb"},
-		{s: "![im1](lin1)![im2](lin2)", want: "<img src=\"lin1\" alt=\"im1\"><img src=\"lin2\" alt=\"im2\">"},
+		{s: "aa ![im](lnk) bb",
+			want: "aa <img src=\"lnk\" alt=\"im\"/> bb"},
+		{s: "![i1](l1)![i2](l2)",
+			want: "<img src=\"l1\" alt=\"i1\"/><img src=\"l2\" alt=\"i2\"/>"},
 	}
 
 	for _, tst := range tests {
 		got := Images(tst.s)
 		if got != tst.want {
-			t.Errorf("Images(%q) generates: %q, should be %q", tst.s, got, tst.want)
+			t.Errorf("Images(%q) generates:\n%q\nshould be:\n%q\n", tst.s, got, tst.want)
 		}
 	}
 }
@@ -204,7 +208,7 @@ func TestInlineCodes(t *testing.T) {
 	for _, tst := range tests {
 		got := InlineCodes(tst.s)
 		if got != tst.want {
-			t.Errorf("InlineCodes(%q) generates: %q, should be %q", tst.s, got, tst.want)
+			t.Errorf("InlineCodes(%q) generates:\n%q\nshould be:\n%q\n", tst.s, got, tst.want)
 		}
 	}
 }
@@ -221,7 +225,7 @@ func TestLinks(t *testing.T) {
 	for _, tst := range tests {
 		got := Links(tst.s)
 		if got != tst.want {
-			t.Errorf("Links(%q) generates: %q, should be %q", tst.s, got, tst.want)
+			t.Errorf("Links(%q) generates:\n%q\nshould be:\n%q\n", tst.s, got, tst.want)
 		}
 	}
 }

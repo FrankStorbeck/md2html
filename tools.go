@@ -57,7 +57,7 @@ func Images(s string) string {
 			if s[i+j+1] == '(' {
 				if k := strings.Index(s[i+j+1:], ")"); k > 0 {
 					s = s[:i] + "<img src=\"" + s[i+j+2:i+j+k+1] + "\" alt=\"" +
-						s[i+2:i+j] + "\">" + Images(s[i+j+k+2:])
+						s[i+2:i+j] + "\"/>" + Images(s[i+j+k+2:])
 				}
 			}
 		}

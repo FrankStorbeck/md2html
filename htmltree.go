@@ -66,13 +66,33 @@ func (ht *HTMLTree) BlockQuote(s string) error {
 	return nil
 }
 
+// Traverse Traverses a slice of siblings. For each string found the function
+// 'f' is called with this string as an argument. This sibling is then replaced
+// by the result of 'f'. When the sibling is a pointer to a branch Traverse is
+// called with a slice of all siblings in this branch as the argument.
+func Traverse(intf []interface{}, f func(string) []interface{}) []interface{} {
+	r := []interface{}{}
+	for _, in := range intf {
+		switch in.(type) {
+		case string:
+			r = append(r, f(in.(string))...)
+		case *branch.Branch:
+			br := in.(*branch.Branch)
+			sblgs := br.Siblings()
+			br.RemoveAll()
+			br.Add(-1, Traverse(sblgs, f)...)
+		}
+	}
+	return r
+}
+
 // Build reconstructs the HTML tree based on the contents of 's'.
 func (ht *HTMLTree) Build(s string) error {
 	raw := s
 	var err error
 	ht.sCount++
 	indnt := CountLeading(s, ' ', -1)
-	s = strings.Repeat(" ", indnt) + strings.TrimSpace(s)
+	s = Inline(strings.Repeat(" ", indnt) + strings.TrimSpace(s))
 	leadingHash := CountLeading(s, '#', 6)
 
 	nEnd := strings.Index(s[indnt:], ".") // end of number for ordered list
@@ -91,6 +111,14 @@ func (ht *HTMLTree) Build(s string) error {
 		}
 
 		switch {
+		case l >= 3 && s[:3] == "```":
+			// Syntactic hightlighting starts or ends
+			return ht.HighLite(s)
+
+		case ht.isHighLited:
+			// Pre coded text
+			ht.br.Add(-1, html.EscapeString(raw))
+
 		case OnlyRunes(s, '='):
 			// previous line was a <h1> line
 			fallthrough
@@ -103,21 +131,13 @@ func (ht *HTMLTree) Build(s string) error {
 			// <h'leadingHash'> line
 			ht.Header(s[leadingHash:], leadingHash)
 
-		case l >= 3 && s[:3] == "```":
-			// Syntactic hightlighting starts or ends
-			return ht.HighLite(s)
-
-		case ht.isHighLited:
-			// Pre coded text
-			ht.br.Add(-1, html.EscapeString(raw))
-
 		case l > 4 && indnt >= 4 && (ht.br.ID == "p" || ht.isQuoted):
 			// pre coded quote
 			err = ht.Quote(html.EscapeString(raw))
 
 		case s[0] == '>':
-			// block Quote
-			err = ht.BlockQuote(Inline(s))
+			// block quote
+			err = ht.BlockQuote(s)
 
 		case l > indnt && (s[indnt] == '*' || s[indnt] == '-' || s[indnt] == '+'):
 			// new unordered list item
@@ -135,10 +155,11 @@ func (ht *HTMLTree) Build(s string) error {
 				if err != nil {
 					ht.Reset()
 				} else {
-					ht.indents = ht.indents[:n+2]
+					ht.indents = ht.indents[:n+1]
 				}
+				ht.br, _ = ht.br.AddBranch(-1, "p")
 			}
-			ht.br.Add(-1, Inline(s[indnt:]))
+			ht.br.Add(-1, s[indnt:])
 
 		case len(ht.tblInfo) > 0:
 			// table row?
@@ -171,7 +192,7 @@ func (ht *HTMLTree) Build(s string) error {
 				s = s[indnt:]
 			}
 
-			ht.br.Add(-1, Inline(s))
+			ht.br.Add(-1, s)
 		}
 	} else {
 		// empty line
@@ -181,24 +202,23 @@ func (ht *HTMLTree) Build(s string) error {
 			err = ht.TryParent(1)
 			ht.tblInfo = TableInfo{}
 
+		case ht.isHighLited:
+			ht.br.Add(-1, raw)
+
 		case ht.inBlock:
-			ht.br.Add(-1, "<br>")
-
-		case ht.inList:
-			// in a list when there is a blank line, siblings are put into a paragraph
-			if ht.br.ID == "li" {
-				sblngs := ht.br.Siblings()
-				ht.br.RemoveAll()
-				ht.br, _ = ht.br.AddBranch(-1, "p")
-				for _, s := range sblngs {
-					ht.br.Add(-1, s)
-				}
+			ht.inBlock = false
+			err = ht.TryParent(1)
+			if err != nil {
+				return err
 			}
-
-		case ht.br.ID == "p":
 			ht.br, _ = ht.br.AddBranch(-1, "p")
 
+		case ht.inList:
+			ht.br.Add(-1, "<p></p>")
+
 		default:
+			ht.TryParent(1)
+			ht.br, _ = ht.br.AddBranch(-1, "p")
 		}
 	}
 	return err
@@ -252,7 +272,7 @@ func (ht *HTMLTree) ChangePrevToTblHdr(s string, newTblInfo *TableInfo) error {
 			ht.tblInfo = TableInfo{}
 		}
 	} else {
-		// resore 'ln'
+		// restore 'ln'
 		ht.br.Add(-1, ln)
 	}
 	return nil
@@ -304,13 +324,13 @@ func CountTblColls(s string) TableInfo {
 	return tblInfo
 }
 
-// Header adds a header line with level 'n' to the HTML tree.
-func (ht *HTMLTree) Header(line string, n int) {
+// Header adds a header with level 'n' to the HTML tree.
+func (ht *HTMLTree) Header(s string, n int) {
 	b := ht.br
 	ht.br = ht.root
 	ht.RmIfEmpty(b)
 	ht.br, _ = ht.br.AddBranch(-1, fmt.Sprintf("h%d", n))
-	ht.br.Add(-1, strings.TrimSpace(line))
+	ht.br.Add(-1, strings.TrimSpace(s))
 	ht.Reset()
 }
 
@@ -430,6 +450,9 @@ func (ht *HTMLTree) ListParent(n int) error {
 // Quote makes the lines show up as pre coded text 's'.
 func (ht *HTMLTree) Quote(line string) error {
 	if ht.br.ID == "p" {
+		if err := ht.TryParent(1); err != nil {
+			return err
+		}
 		ht.br, _ = ht.br.AddBranch(-1, "pre")
 		ht.br, _ = ht.br.AddBranch(-1, "code")
 		ht.isQuoted = true
@@ -440,9 +463,12 @@ func (ht *HTMLTree) Quote(line string) error {
 
 // Reset resets the current tree to a new paragraph in 'root'
 func (ht *HTMLTree) Reset() {
-	ht.inList = false
-	ht.inBlock = false
 	ht.br = ht.root
+	ht.inBlock = false
+	ht.indents = []int{}
+	ht.inList = false
+	ht.isHighLited = false
+	ht.isQuoted = false
 	ht.br, _ = ht.root.AddBranch(-1, "p")
 }
 
