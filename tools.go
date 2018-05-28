@@ -17,6 +17,44 @@ import (
 	"strings"
 )
 
+// CodeUni replaces all runes given in 'runes' by its uni code. when 'esc' is
+// true, only escaped runes are replaced. A rune is escaped by putting a '\' in
+// front of it.
+func CodeUni(s string, runes []byte, esc bool) string {
+	b := []byte(s)
+	for _, r := range runes {
+		var old []byte
+		if esc {
+			old = []byte{'\\', r}
+		} else {
+			old = []byte{r}
+		}
+		new := []byte(fmt.Sprintf("U+%04X", r))
+		b = bytes.Replace(b, old, new, -1)
+	}
+	return string(b)
+}
+
+// DecodeUni replaces unicoded runes a by the rune itself as given in 'runes'.
+// When 'esc' is true, the rune will be escaped by placing a '\' char in front
+// of it.
+func DecodeUni(s string, runes []byte, esc bool) string {
+	b := []byte(s)
+
+	for _, r := range runes {
+		old := []byte(fmt.Sprintf("U+%04X", r))
+		var new []byte
+		if esc {
+			new = []byte{'\\', r}
+		} else {
+			new = []byte{r}
+		}
+		b = bytes.Replace(b, old, new, -1)
+	}
+
+	return string(b)
+}
+
 // OnlyRunes tests if a string of at least three runes 'rn' and no other runes.
 func OnlyRunes(s string, rn rune) bool {
 	if len(s) < 3 {
@@ -56,7 +94,8 @@ func Images(s string) string {
 		if j := strings.Index(s[i:], "]"); j > 0 && l > (i+j+2) {
 			if s[i+j+1] == '(' {
 				if k := strings.Index(s[i+j+1:], ")"); k > 0 {
-					s = s[:i] + "<img src=\"" + s[i+j+2:i+j+k+1] + "\" alt=\"" +
+					uc := CodeUni(s[i+j+2:i+j+k+1], []byte{'*', '_', '~'}, false)
+					s = s[:i] + "<img src=\"" + uc + "\" alt=\"" +
 						s[i+2:i+j] + "\"/>" + Images(s[i+j+k+2:])
 				}
 			}
@@ -68,11 +107,12 @@ func Images(s string) string {
 // Inline translates all inline mark down definitions
 // to their html equivalents
 func Inline(s string) string {
-	s = StrongEmDel(s)
-	s = Images(s)
-	s = Links(s) // always after Images(s)!
+	// order is important here
 	s = InlineCodes(s)
-	return s
+	s = Images(s)
+	s = Links(s)
+	s = StrongEmDel(s)
+	return DecodeUni(s, []byte{'*', '_', '~'}, false)
 }
 
 // InlineCodes translates mark down code definitions to their html equivalents
@@ -80,7 +120,8 @@ func InlineCodes(s string) string {
 	l := len(s)
 	if i := strings.Index(s, "`"); i >= 0 && l > i+2 {
 		if j := strings.Index(s[i+1:], "`"); j > 0 {
-			s = s[:i] + "<code>" + html.EscapeString(s[i+1:i+j+1]) +
+			uc := CodeUni(s[i+1:i+j+1], []byte{'*', '_', '~'}, false)
+			s = s[:i] + "<code>" + html.EscapeString(uc) +
 				"</code>" + InlineCodes(s[i+j+2:])
 		}
 	}
@@ -94,7 +135,8 @@ func Links(s string) string {
 		if j := strings.Index(s[i:], "]"); j > 0 && l > (i+j+1) {
 			if s[i+j+1] == '(' {
 				if k := strings.Index(s[i+j+1:], ")"); k > 0 {
-					s = s[:i] + "<a href=\"" + s[i+j+2:i+j+k+1] + "\">" + s[i+1:i+j] +
+					uc := CodeUni(s[i+j+2:i+j+k+1], []byte{'*', '_', '~'}, false)
+					s = s[:i] + "<a href=\"" + uc + "\">" + s[i+1:i+j] +
 						"</a>" + Links(s[i+j+k+2:])
 				}
 			}
@@ -119,7 +161,7 @@ func StrongEmDel(s string) string {
 	for i, tg := range tgs {
 		seps[i] = tg.sep[0][0]
 	}
-	s = UniCode(s, seps)
+	s = CodeUni(s, seps, true)
 
 	for _, t := range tgs {
 		for _, sp := range t.sep {
@@ -145,30 +187,5 @@ func StrongEmDel(s string) string {
 		}
 	}
 
-	return UnEscape(s, seps)
-}
-
-// UnEscape replaces unicode by its (non escaped) character.
-func UnEscape(s string, esc []byte) string {
-	b := []byte(s)
-
-	for _, sp := range esc {
-		old := []byte(fmt.Sprintf("U+%04X", sp))
-		new := []byte{sp}
-		b = bytes.Replace(b, old, new, -1)
-	}
-
-	return string(b)
-}
-
-// UniCode replaces escaped characters by its uni code. A character is escaped
-// by putting a '\' in front of it.
-func UniCode(s string, esc []byte) string {
-	b := []byte(s)
-	for _, sp := range esc {
-		old := []byte{'\\', sp}
-		new := []byte(fmt.Sprintf("U+%04X", sp))
-		b = bytes.Replace(b, old, new, -1)
-	}
-	return string(b)
+	return DecodeUni(s, seps, false)
 }

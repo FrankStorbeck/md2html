@@ -504,7 +504,7 @@ func (ht *HTMLTree) TblRow(s string, hdr bool) error {
 // TRow returns a branch holding a table row. If hdr is true, a table header
 // is asumed. tblInfo holds the TableInfo for the table collumns ,
 func TRow(s string, hdr bool, tblInfo *TableInfo) *branch.Branch {
-	cols := strings.Split(strings.TrimSpace(UniCode(s, []byte{'|'})), "|")
+	cols := strings.Split(strings.TrimSpace(CodeUni(s, []byte{'|'}, true)), "|")
 
 	l := len(cols)
 	if l < 3 || len(cols[0]) > 0 || len(cols[l-1]) > 0 {
@@ -539,7 +539,7 @@ func TRow(s string, hdr bool, tblInfo *TableInfo) *branch.Branch {
 			br.Info = fmt.Sprintf("style=\"text-align: %s\"", a)
 		}
 
-		br.Add(-1, strings.TrimSpace(UniCode(col, []byte{'|'})))
+		br.Add(-1, strings.TrimSpace(CodeUni(col, []byte{'|'}, true)))
 		br, _ = br.Parent(1)
 	}
 	return rslt

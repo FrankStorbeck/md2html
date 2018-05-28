@@ -35,17 +35,22 @@ func TestStyling(t *testing.T) {
 func TestUniCode(t *testing.T) {
 	tests := []struct {
 		s    string
+		esc  bool
 		want string
 	}{
-		{s: "a \\* b", want: "a U+002A b"},
-		{s: "\\* b", want: "U+002A b"},
-		{s: "a \\*", want: "a U+002A"},
-		{s: "a \\_ b", want: "a \\_ b"},
+		{s: "a \\* b", esc: true, want: "a U+002A b"},
+		{s: "\\* b", esc: true, want: "U+002A b"},
+		{s: "a \\*", esc: true, want: "a U+002A"},
+		{s: "a \\_ b", esc: true, want: "a \\_ b"},
+		{s: "a \\* b", esc: false, want: "a \\U+002A b"},
+		{s: "\\* b", esc: false, want: "\\U+002A b"},
+		{s: "a \\*", esc: false, want: "a \\U+002A"},
+		{s: "a \\_ b", esc: true, want: "a \\_ b"},
 	}
 	for _, tst := range tests {
-		got := UniCode(tst.s, []byte{'*'})
+		got := CodeUni(tst.s, []byte{'*'}, tst.esc)
 		if got != tst.want {
-			t.Errorf("UniCode(%q, []byte{'*'}) generates:\n%q\nshould be:\n%q\n", tst.s, got, tst.want)
+			t.Errorf("CodeUni(%q, []byte{'*'}, %t) generates:\n%q\nshould be:\n%q\n", tst.s, tst.esc, got, tst.want)
 		}
 	}
 }
@@ -53,17 +58,22 @@ func TestUniCode(t *testing.T) {
 func TestUnEscape(t *testing.T) {
 	tests := []struct {
 		s    string
+		esc  bool
 		want string
 	}{
-		{s: "a U+002A b", want: "a * b"},
-		{s: "U+002A b", want: "* b"},
-		{s: "a U+002A", want: "a *"},
-		{s: "a U+002B b", want: "a U+002B b"},
+		{s: "a U+002A b", esc: false, want: "a * b"},
+		{s: "U+002A b", esc: false, want: "* b"},
+		{s: "a U+002A", esc: false, want: "a *"},
+		{s: "a U+002B b", esc: false, want: "a U+002B b"},
+		{s: "a U+002A b", esc: true, want: "a \\* b"},
+		{s: "U+002A b", esc: true, want: "\\* b"},
+		{s: "a U+002A", esc: true, want: "a \\*"},
+		{s: "a U+002B b", esc: true, want: "a U+002B b"},
 	}
 	for _, tst := range tests {
-		got := UnEscape(tst.s, []byte{'*'})
+		got := DecodeUni(tst.s, []byte{'*'}, tst.esc)
 		if got != tst.want {
-			t.Errorf("UnEscape(%q, []byte{'*'}) generates:\n%q\nshould be:\n%q\n", tst.s, got, tst.want)
+			t.Errorf("DecodeUni(%q, []byte{'*'}) generates:\n%q\nshould be:\n%q\n", tst.s, got, tst.want)
 		}
 	}
 }
