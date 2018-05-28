@@ -29,6 +29,7 @@
 // CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
+
 package main
 
 import (
@@ -59,6 +60,25 @@ func TestStyling(t *testing.T) {
 		got := StrongEmDel(tst.s)
 		if got != tst.want {
 			t.Errorf("StrongEmDel(%q) generates:\n%q\nshould be:\n%q\n", tst.s, got, tst.want)
+		}
+	}
+}
+
+func TestBreak(t *testing.T) {
+	tests := []struct {
+		s    string
+		want string
+	}{
+		{s: "  ", want: "<br/>"},
+		{s: "aaa ", want: "aaa"},
+		{s: "aaa", want: "aaa"},
+		{s: "aaa  ", want: "aaa<br/>"},
+		{s: "aaa    ", want: "aaa<br/>"},
+	}
+	for _, tst := range tests {
+		got := Break(tst.s)
+		if got != tst.want {
+			t.Errorf("Break(%q) generates: %q, should be: %q ", tst.s, got, tst.want)
 		}
 	}
 }
@@ -115,7 +135,7 @@ func TestOlnlyRunes(t *testing.T) {
 		want bool
 	}{
 		{s: "", want: false},
-		{s: "==", want: false},
+		{s: "=", want: true},
 		{s: "===", want: true},
 		{s: "=======", want: true},
 		{s: "=======x", want: false},
@@ -153,56 +173,111 @@ func TestCountLeading(t *testing.T) {
 	}
 }
 
+func TestIndentIndex(t *testing.T) {
+	tests := []struct {
+		indnt int
+		want  int
+	}{
+		{indnt: -5, want: -1},
+		{indnt: -1, want: -1},
+		{indnt: 0, want: 0},
+		{indnt: 1, want: 0},
+		{indnt: 2, want: 1},
+		{indnt: 3, want: 1},
+		{indnt: 11, want: 5},
+		{indnt: 12, want: 6},
+		{indnt: 13, want: 6},
+		{indnt: 19, want: 6},
+		{indnt: 20, want: 7},
+		{indnt: 21, want: 7},
+	}
+	indnt := []int{0, 2, 4, 5, 6, 8, 12}
+	ht := NewHTMLTree("r")
+	ht.lstIndnts = indnt
+	ht.nextIndnt = 20
+	for _, tst := range tests {
+		got := ht.IndentIndex(tst.indnt)
+		if got != tst.want {
+			t.Errorf("IndentIndex(%d) generates:%d, should be: %d", tst.indnt, got, tst.want)
+		}
+	}
+}
+
 func TestBuild(t *testing.T) {
 	tests := []struct {
 		s    []string
 		want string
 	}{
+		// Paragraphs
+		{s: []string{},
+			want: "r{}"},
+		{s: []string{"a"},
+			want: "r{p{\"a\"}}"},
+		{s: []string{"a", "b"},
+			want: "r{p{\"a\" \"b\"}}"},
+		{s: []string{"a", "b", "", "c", "d"},
+			want: "r{p{\"a\" \"b\"} p{\"c\" \"d\"}}"},
+
 		// Headers
-		{s: []string{"hdr1", "==="}, want: "r{h1{hdr1} p{}}"},
-		{s: []string{"hdr2", "---"}, want: "r{h2{hdr2} p{}}"},
-		{s: []string{"aa", "# hdr1", "bb"}, want: "r{p{aa} h1{hdr1} p{bb}}"},
-		{s: []string{"aa", "### hdr3", "bb"}, want: "r{p{aa} h3{hdr3} p{bb}}"},
-		{s: []string{"###### hdr6"}, want: "r{h6{hdr6} p{}}"},
-		{s: []string{"####### hdr7"}, want: "r{p{####### hdr7}}"},
+		{s: []string{"hr1", "==="},
+			want: "r{h1(id=\"hr1\"){\"hr1\"}}"},
+		{s: []string{"Hr 2", "---"},
+			want: "r{h2(id=\"hr-2\"){\"Hr 2\"}}"},
+		{s: []string{"a", "# hr1", "b"},
+			want: "r{p{\"a\" \"# hr1\" \"b\"}}"},
+		{s: []string{"a", "", "# hr1", "b"},
+			want: "r{p{\"a\"} h1(id=\"hr1\"){\"hr1\"} p{\"b\"}}"},
+		{s: []string{"", "### hdr3", "b"},
+			want: "r{h3(id=\"hdr3\"){\"hdr3\"} p{\"b\"}}"},
+		{s: []string{"###### hdr6"},
+			want: "r{h6(id=\"hdr6\"){\"hdr6\"}}"},
+		{s: []string{"####### hdr7"},
+			want: "r{p{\"####### hdr7\"}}"},
 
 		// Quoting
 		{s: []string{"> quote"},
-			want: "r{blockquote{quote }}"},
-		{s: []string{"aa", "> quote1", "> quote2", "bb"},
-			want: "r{p{aa} blockquote{quote1  quote2 } p{bb}}"},
-		{s: []string{"aa", "> quote1", "", "> quote2", "bb"},
-			want: "r{p{aa} blockquote{quote1 } blockquote{quote2 } p{bb}}"},
-		{s: []string{"aa`cc`bb"}, want: "r{p{aa<code>cc</code>bb}}"},
-		{s: []string{"aa", "```", "a1", "a2", "```", "bb"}, want: "r{p{aa} pre{code{a1 a2}} p{bb}}"},
+			want: "r{blockquote{\"quote\"}}"},
+		{s: []string{"a", "> q1", "> q2", "b"},
+			want: "r{p{\"a\" blockquote{\"q1\" \"q2\" \"b\"}}}"},
+		{s: []string{"> q1", "", "> q2", "b"},
+			want: "r{blockquote{\"q1\"} blockquote{\"q2\" \"b\"}}"},
+		{s: []string{"a`c`b"},
+			want: "r{p{\"a<code>c</code>b\"}}"},
+		{s: []string{"a", "```", "b", "c", "```", "d"},
+			want: "r{p{\"a\" pre{code{\"b\" \"c\"}} \"d\"}}"},
+		{s: []string{"> a", "```", "b", "c", "```", ">d"},
+			want: "r{blockquote{\"a\" \"```\" \"b\" \"c\" \"```\" \"d\"}}"},
+		{s: []string{"> a", "> > b", "> c", "d", "", "d"},
+			want: "r{blockquote{\"a\" blockquote{\"b\"} \"c\" \"d\"} p{\"d\"}}"},
 
 		// Lists
-		{s: []string{"aa", "* 1", "* 2", "  + 2.1", "  + 2.2", "    - 2.2.1", "  + 2.3", "* 3", "cc"},
-			want: "r{p{aa} ul{li{1} li{2} ul{li{2.1} li{2.2} ul{li{2.2.1}} li{2.3}} li{3}} p{cc}}"},
-		{s: []string{"aa", "  * 1", "   l1", "  * 2", "   l2", "c"},
-			want: "r{p{aa} ul{li{1 l1} li{2 l2}} p{c}}"},
+		{s: []string{"a", "* 1", "* 2", "  + 2.1", "  + 2.2", "    - 2.2.1", "  + 2.3", "* 3", "c"},
+			want: "r{p{\"a\" ul{li{\"1\"} li{\"2\"} ul{li{\"2.1\"} li{\"2.2\"} ul{li{\"2.2.1\"}} li{\"2.3\"}} li{\"3\"}} \"c\"}}"},
+		{s: []string{"a", "  * 1", "   l1", "  * 2", "   l2", "c"},
+			want: "r{p{\"a\" ul{li{\"1\" \"l1\"} li{\"2\" \"l2\"}} \"c\"}}"},
+		{s: []string{"a", "", "- b", "  * c", "  d", "- e", "f"},
+			want: "r{p{\"a\"} ul{li{\"b\"} ul{li{\"c\" \"d\"}} li{\"e\"}} p{\"f\"}}"},
 		{s: []string{"a", "", "- b", "", "  * c", "", "  d", "", "- e", "", "f"},
-			want: "r{p{a} ul{li{b <p></p>} ul{li{c <p></p>}} p{d <p></p>} li{e <p></p>}} p{f}}"},
+			want: "r{p{\"a\"} ul{li{\"b\" \"<br/>\"} ul{li{\"c\" \"<br/>\" \"d\" \"<br/>\"}} li{\"e\" \"<br/>\"}} p{\"f\"}}"},
 		{s: []string{"* 1", "* 2", "a", "* p", "* q"},
-			want: "r{ul{li{1} li{2}} p{a} ul{li{p} li{q}}}"},
+			want: "r{ul{li{\"1\"} li{\"2\"}} p{\"a\" ul{li{\"p\"} li{\"q\"}}}}"},
 		{s: []string{"a", "* 1", "* 2", "  + a", "* 3", "", "  b", " c", "* 4", "d"},
-			want: "r{p{a} ul{li{1} li{2} ul{li{a}} li{3 <p></p> b c} li{4}} p{d}}"},
-		{s: []string{"aa", "1. 1", "2. 2", "   2. 2.1", "   2. 2.2", "cc"},
-			want: "r{p{aa} ol{li{1} li{2} ol{li{2.1} li{2.2}}} p{cc}}"},
-		{s: []string{"aa", "1. 1", "2. 2", "   - 2.1", "   - 2.2", "cc"},
-			want: "r{p{aa} ol{li{1} li{2} ul{li{2.1} li{2.2}}} p{cc}}"},
+			want: "r{p{\"a\" ul{li{\"1\"} li{\"2\"} ul{li{\"a\"}} li{\"3\" \"<br/>\" \"b\" \"c\"} li{\"4\"}} \"d\"}}"},
+		{s: []string{"a", "1. 1", "2. 2", "   2. 2.1", "   2. 2.2", "c"},
+			want: "r{p{\"a\" ol{li{\"1\"} li{\"2\"} ol{li{\"2.1\"} li{\"2.2\"}}} \"c\"}}"},
+		{s: []string{"a", "1. 1", "2. 2", "   - 2.1", "   - 2.2", "c"},
+			want: "r{p{\"a\" ol{li{\"1\"} li{\"2\"} ul{li{\"2.1\"} li{\"2.2\"}}} \"c\"}}"},
 
 		// Tables
 		{s: []string{"s", "| A | B |", "| --- | --- |", "| a | b |", "", "e"},
-			want: "r{p{s table:style=\"width: 100%\"{tr{th{A} th{B}} tr{td{a} td{b}}} e}}"},
+			want: "r{p{\"s\" table(style=\"width: 100%\"){tr{th{\"A\"} th{\"B\"}} tr{td{\"a\"} td{\"b\"}}} p{\"e\"}}}"},
 		{s: []string{"s", "| A | B |", "|| --- |  | --- ||", "| a | b |", "", "e"},
-			want: "r{p{s table:style=\"width: 100%\"{tr{th{A} th{B}} tr{td{a} td{b}}} e}}"},
+			want: "r{p{\"s\" table(style=\"width: 100%\"){tr{th{\"A\"} th{\"B\"}} tr{td{\"a\"} td{\"b\"}}} p{\"e\"}}}"},
 		{s: []string{"s", "| A | B | C | D |", "| --- | :--- | ---: | :---: |", "| a | b | c | d |", "e"},
-			want: "r{p{s table:style=\"width: 100%\"{tr{th{A} th:style=\"text-align: left\"{B} th:style=\"text-align: right\"{C} th:style=\"text-align: center\"{D}} tr{td{a} td:style=\"text-align: left\"{b} td:style=\"text-align: right\"{c} td:style=\"text-align: center\"{d}}} e}}"},
+			want: "r{p{\"s\" table(style=\"width: 100%\"){tr{th{\"A\"} th(style=\"text-align: left\"){\"B\"} th(style=\"text-align: right\"){\"C\"} th(style=\"text-align: center\"){\"D\"}} tr{td{\"a\"} td(style=\"text-align: left\"){\"b\"} td(style=\"text-align: right\"){\"c\"} td(style=\"text-align: center\"){\"d\"}}} \"e\"}}"},
 	}
 	for _, tst := range tests {
 		ht := NewHTMLTree("r")
-		ht.br, _ = ht.br.AddBranch(-1, "p")
 
 		for _, s := range tst.s {
 			err := ht.Build(s)
@@ -213,8 +288,12 @@ func TestBuild(t *testing.T) {
 
 		got := ht.root.String()
 		if got != tst.want {
-			t.Errorf("Build(%q)... generates:\n%q\nshould be:\n%q\n",
-				tst.s[0], got, tst.want)
+			args := ""
+			for _, s := range tst.s {
+				args = args + "#" + s
+			}
+			t.Errorf("Build(%s) generates:\n%q\nshould be:\n%q\n",
+				"\""+args+"\"", got, tst.want)
 		}
 	}
 }
@@ -224,8 +303,8 @@ func TestImages(t *testing.T) {
 		s    string
 		want string
 	}{
-		{s: "aa ![im](lnk) bb",
-			want: "aa <img src=\"lnk\" alt=\"im\"/> bb"},
+		{s: "a ![im](lnk) b",
+			want: "a <img src=\"lnk\" alt=\"im\"/> b"},
 		{s: "![i1](l1)![i2](l2)",
 			want: "<img src=\"l1\" alt=\"i1\"/><img src=\"l2\" alt=\"i2\"/>"},
 	}
@@ -243,7 +322,7 @@ func TestInlineCodes(t *testing.T) {
 		s    string
 		want string
 	}{
-		{s: "aa `code` bb", want: "aa <code>code</code> bb"},
+		{s: "a `code` b", want: "a <code>code</code> b"},
 	}
 
 	for _, tst := range tests {
@@ -259,7 +338,7 @@ func TestLinks(t *testing.T) {
 		s    string
 		want string
 	}{
-		{s: "aa [txt](link) bb", want: "aa <a href=\"link\">txt</a> bb"},
+		{s: "a [txt](link) b", want: "a <a href=\"link\">txt</a> b"},
 		{s: "[t1](l1)[t2](l2)", want: "<a href=\"l1\">t1</a><a href=\"l2\">t2</a>"},
 	}
 

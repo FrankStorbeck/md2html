@@ -107,10 +107,16 @@ func (br *Branch) Len() int {
 	return len(br.siblings)
 }
 
-func escape(s string) string {
-	r := strings.Replace(s, "{", "\\{", -1)
-	r = strings.Replace(r, "}", "\\}", -1)
-	return r
+func escape(s string, brackets bool) string {
+	if brackets {
+		s = strings.Replace(s, "(", "\\(", -1)
+		s = strings.Replace(s, ")", "\\)", -1)
+	} else {
+		s = strings.Replace(s, "{", "\\{", -1)
+		s = strings.Replace(s, "}", "\\}", -1)
+		s = strings.Replace(s, "\"", "\\\"", -1)
+	}
+	return s
 }
 
 // NewBranch returns a pointer to a new Branch struct with identifier 's'.
@@ -213,11 +219,11 @@ func (br *Branch) SiblingN(n int) (interface{}, error) {
 }
 
 // String returns a string holding the tree in the following format:
-// ID[:Info]{siblings...}
+// ID[(Info)]{siblings...}
 func (br *Branch) String() string {
-	s := escape(br.ID)
+	s := escape(escape(br.ID, true), false)
 	if len(br.Info) > 0 {
-		s = s + ":" + strings.TrimSpace(escape(br.Info))
+		s = s + "(" + strings.TrimSpace(escape(br.Info, true)) + ")"
 	}
 
 	s = s + "{"
@@ -227,7 +233,7 @@ func (br *Branch) String() string {
 		case *Branch:
 			s = s + space + k.String()
 		case string:
-			s = s + space + escape(k)
+			s = s + space + "\"" + escape(k, false) + "\""
 		default:
 			s = s + fmt.Sprint(k)
 		}
@@ -257,11 +263,11 @@ func (br *Branch) testIndx(n int) (int, error) {
 
 // TreePath returns a string holding the tree path ending at 'b'. The path has
 // the format "/root.ID/.../br.ID".
-func TreePath(b *Branch) string {
+func (br *Branch) TreePath() string {
 	s := ""
-	for b != nil {
-		s = b.ID + "/" + s
-		b = b.parent
+	for br != nil {
+		s = br.ID + "/" + s
+		br = br.parent
 	}
 	return "/" + s
 }

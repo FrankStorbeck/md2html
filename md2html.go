@@ -115,7 +115,6 @@ func Configure() *Config {
 	version := flag.Bool("version", false, "Show version number and exit")
 	if *version {
 		fmt.Printf("Version %s\n", cVersion)
-		os.Exit(0)
 	}
 
 	input := flag.String("in", "stdin", "path to input file")

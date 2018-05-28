@@ -37,7 +37,20 @@ import (
 	"fmt"
 	"html"
 	"strings"
+	"unicode"
 )
+
+// Break adds a break when the line ends with two or more spaces. It also slices
+// off all trailing spaces.
+func Break(s string) string {
+	l := len(s)
+	brk := ""
+	if i := strings.LastIndex(s, "  "); i >= 0 && i >= l-2 {
+		brk = "<br/>"
+		s = s[:l-2]
+	}
+	return strings.TrimRightFunc(s, unicode.IsSpace) + brk
+}
 
 // CodeUni replaces all runes given in 'runes' by its uni code. when 'esc' is
 // true, only escaped runes are replaced. A rune is escaped by putting a '\' in
@@ -77,9 +90,10 @@ func DecodeUni(s string, runes []byte, esc bool) string {
 	return string(b)
 }
 
-// OnlyRunes tests if a string of at least three runes 'rn' and no other runes.
+// OnlyRunes tests if a string consists of one or more runes 'rn' and no
+// other runes.
 func OnlyRunes(s string, rn rune) bool {
-	if len(s) < 3 {
+	if len(s) < 1 {
 		return false
 	}
 	for _, r := range s {

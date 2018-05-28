@@ -61,10 +61,10 @@ func TestAdd(t *testing.T) {
 		want    string
 	}{
 		{0, "s2", fmt.Sprintf("%s", ErrNoSiblings)},
-		{-1, "s2", "root{s2}"},
-		{0, "s0", "root{s0 s2}"},
-		{1, "s1", "root{s0 s1 s2}"},
-		{-1, "{s3}", "root{s0 s1 s2 \\{s3\\}}"},
+		{-1, "s2", "root{\"s2\"}"},
+		{0, "s0", "root{\"s0\" \"s2\"}"},
+		{1, "s1", "root{\"s0\" \"s1\" \"s2\"}"},
+		{-1, "{s3}", "root{\"s0\" \"s1\" \"s2\" \"\\{s3\\}\"}"},
 		{4, "s3", "sibling index (4) out of range (0-3)"},
 	}
 
@@ -90,10 +90,14 @@ func TestAdd(t *testing.T) {
 		sibling []interface{}
 		want    string
 	}{
-		{-1, []interface{}{"s2", "s3"}, "root{s2 s3}"},
-		{0, []interface{}{"s0", "s1"}, "root{s0 s1 s2 s3}"},
-		{-1, []interface{}{"s6", "s7"}, "root{s0 s1 s2 s3 s6 s7}"},
-		{4, []interface{}{"s4", "s5"}, "root{s0 s1 s2 s3 s4 s5 s6 s7}"},
+		{-1, []interface{}{"s2", "s3"},
+			"root{\"s2\" \"s3\"}"},
+		{0, []interface{}{"s0", "s1"},
+			"root{\"s0\" \"s1\" \"s2\" \"s3\"}"},
+		{-1, []interface{}{"s6", "s7"},
+			"root{\"s0\" \"s1\" \"s2\" \"s3\" \"s6\" \"s7\"}"},
+		{4, []interface{}{"s4", "s5"},
+			"root{\"s0\" \"s1\" \"s2\" \"s3\" \"s4\" \"s5\" \"s6\" \"s7\"}"},
 	}
 
 	for _, tst := range tests2 {
@@ -118,10 +122,10 @@ func TestAddBranch(t *testing.T) {
 		want string
 	}{
 		{0, "s2", fmt.Sprintf("%s", ErrNoSiblings)},
-		{-1, "b2", "root{b2{s}}"},
-		{0, "b0", "root{b0{s} b2{s}}"},
-		{1, "b1", "root{b0{s} b1{s} b2{s}}"},
-		{-1, "b3", "root{b0{s} b1{s} b2{s} b3{s}}"},
+		{-1, "b2", "root{b2{\"s\"}}"},
+		{0, "b0", "root{b0{\"s\"} b2{\"s\"}}"},
+		{1, "b1", "root{b0{\"s\"} b1{\"s\"} b2{\"s\"}}"},
+		{-1, "b3", "root{b0{\"s\"} b1{\"s\"} b2{\"s\"} b3{\"s\"}}"},
 		{4, "b3", "sibling index (4) out of range (0-3)"},
 	}
 
@@ -137,7 +141,7 @@ func TestAddBranch(t *testing.T) {
 		} else {
 			br.Add(-1, "s")
 			if s := root.String(); s != tst.want {
-				t.Errorf("AddBranch(%d, %s) returns: %q, should be %q",
+				t.Errorf("AddBranch(%d, %q) returns: %q, should be %q",
 					tst.n, tst.id, s, tst.want)
 			}
 		}
@@ -267,9 +271,9 @@ func TestRemove(t *testing.T) {
 		n    int
 		want string
 	}{
-		{1, "root{b0{s} b2{s} b3{s}}"},
-		{0, "root{b2{s} b3{s}}"},
-		{-1, "root{b2{s}}"},
+		{1, "root{b0{\"s\"} b2{\"s\"} b3{\"s\"}}"},
+		{0, "root{b2{\"s\"} b3{\"s\"}}"},
+		{-1, "root{b2{\"s\"}}"},
 	}
 
 	for i, tst := range tests {
