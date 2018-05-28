@@ -96,6 +96,20 @@ func (ht *HTMLTree) BlockQuote(s string) {
 	}
 }
 
+// Plain changes spaces in 's' to '-', puts everything in lower case and finally
+// removes all tag info.
+func Plain(s string) string {
+	s = strings.ToLower(strings.Replace(s, " ", "-", -1))
+
+	tags := []string{cCode, "strong", "em", "del"}
+	for _, t := range tags {
+		s = strings.Replace(s, "<"+t+">", "", -1)
+		s = strings.Replace(s, "</"+t+">", "", -1)
+	}
+
+	return s
+}
+
 // Build reconstructs the HTML tree based on the contents of 's'.
 func (ht *HTMLTree) Build(s string) error {
 	raw := s
