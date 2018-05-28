@@ -109,6 +109,20 @@ func Traverse(intf []interface{}, f func(string) []interface{}) []interface{} {
 	return r
 }
 
+// Plain changes spaces in 's' to '-', puts everything in lower case and finally
+// removes all tag info.
+func Plain(s string) string {
+	s = strings.ToLower(strings.Replace(s, " ", "-", -1))
+
+	tags := []string{cCode, "strong", "em", "del"}
+	for _, t := range tags {
+		s = strings.Replace(s, "<"+t+">", "", -1)
+		s = strings.Replace(s, "</"+t+">", "", -1)
+	}
+
+	return s
+}
+
 // Build reconstructs the HTML tree based on the contents of 's'.
 func (ht *HTMLTree) Build(s string) error {
 	raw := s
@@ -353,7 +367,9 @@ func (ht *HTMLTree) Header(s string, n int) {
 	ht.br = ht.root
 	ht.RmIfEmpty(b)
 	ht.br, _ = ht.br.AddBranch(-1, fmt.Sprintf("h%d", n))
-	ht.br.Add(-1, strings.TrimSpace(s))
+	hdr := strings.TrimSpace(s)
+	ht.br.Info = "id=\"" + Plain(hdr) + "\""
+	ht.br.Add(-1, hdr)
 	ht.Reset()
 }
 
