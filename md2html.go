@@ -73,7 +73,7 @@ const (
 	cTitle      = "title"
 	cTr         = "tr"
 	cUl         = "ul"
-	cVersion    = "0.1"
+	cVersion    = "1.0"
 )
 
 // Config holds all configuration data

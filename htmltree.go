@@ -74,6 +74,7 @@ const (
 	center
 )
 
+// popIndents pops 'n' ListIndents from the ht.lstIndnts stack
 func (ht *HTMLTree) popIndents(n int) {
 	if n < 0 {
 		n = 0
@@ -90,10 +91,20 @@ func (ht *HTMLTree) popIndents(n int) {
 	ht.lstParents = ht.lstParents[:n]
 }
 
+// pushIndents pushes 'indnt' on the 'ht.lstIndnts' stack
 func (ht *HTMLTree) pushIndents(indnt int) {
 	ht.lstIndnts = append(ht.lstIndnts, ht.nextIndnt)
 	ht.lstParents = append(ht.lstParents, ht.br)
 	ht.nextIndnt = indnt
+}
+
+func (ht *HTMLTree) testLeadingHash(s string) bool {
+	if leadingHash := CountLeading(s, '#', 6); leadingHash > 0 {
+		// <h'leadingHash'> line
+		ht.Header(s[leadingHash:], leadingHash)
+		return true
+	}
+	return false
 }
 
 // BlockQuote adds string 's' as a block quote. If it isn't a continuation of
@@ -194,14 +205,12 @@ func (ht *HTMLTree) Build(s string) error {
 					}
 				}
 			} else {
-				if leadingHash := CountLeading(s, '#', 6); leadingHash > 0 {
-					// <h'leadingHash'> line
-					ht.Header(s[leadingHash:], leadingHash)
+				if ht.testLeadingHash(s) {
 					return nil
 				}
 				ht.popIndents(0)
-				if ht.br.ID != "p" {
-					ht.br, _ = ht.br.AddBranch(-1, "p")
+				if ht.br.ID != cP {
+					ht.br, _ = ht.br.AddBranch(-1, cP)
 					ht.parCount = 1
 				}
 			}
@@ -210,13 +219,11 @@ func (ht *HTMLTree) Build(s string) error {
 
 		switch ht.parCount {
 		case 0:
-			if leadingHash := CountLeading(s, '#', 6); leadingHash > 0 {
-				// <h'leadingHash'> line
-				ht.Header(s[leadingHash:], leadingHash)
+			if ht.testLeadingHash(s) {
 				return nil
 			}
-			if ht.br.ID != "p" {
-				ht.br, _ = ht.br.AddBranch(-1, "p")
+			if ht.br.ID != cP {
+				ht.br, _ = ht.br.AddBranch(-1, cP)
 			}
 			ht.br.Add(-1, s)
 			ht.parCount++
@@ -250,7 +257,7 @@ func (ht *HTMLTree) Build(s string) error {
 			// end of table
 			err = ht.TryParent(1)
 			ht.tblInfo = TableInfo{}
-			ht.br, _ = ht.br.AddBranch(-1, "p")
+			ht.br, _ = ht.br.AddBranch(-1, cP)
 			ht.parCount = 0
 
 		case ht.blockQuoteLevel > 0:
@@ -426,7 +433,7 @@ func (ht *HTMLTree) ListItem(s string, indnt, nEnd int) error {
 	if len(ht.lstIndnts) <= 0 {
 		ht.nextIndnt = indnt
 	} else {
-		err := ht.LP(0)
+		err := ht.TryListParent(0)
 		if err != nil {
 			return err
 		}
@@ -457,39 +464,6 @@ func (ht *HTMLTree) ListItem(s string, indnt, nEnd int) error {
 	ht.br, _ = ht.br.AddBranch(-1, "li")
 	ht.br.Add(-1, strings.TrimSpace(s[indnt+nEnd+1:]))
 
-	return nil
-}
-
-func (ht *HTMLTree) LP(n int) error {
-	i := 0
-	for n >= 0 {
-		atList := ht.br.ID == "ul" || ht.br.ID == "ol"
-		if atList {
-			n--
-		}
-		if n >= 0 {
-			var br *branch.Branch
-			err := ht.TryParent(1)
-			if atList {
-				br = ht.br
-				i++
-			}
-			if err != nil {
-				return err
-			}
-
-			if ht.br == ht.root {
-				// use the last parent of the "ul" or "ol" branch
-				ht.br = br
-				return nil
-			}
-		}
-	}
-
-	if i > 0 {
-		l := len(ht.lstIndnts)
-		ht.popIndents(l - i)
-	}
 	return nil
 }
 
@@ -630,6 +604,40 @@ func TRow(s string, hdr bool, tblInfo *TableInfo) *branch.Branch {
 		br, _ = br.Parent(1)
 	}
 	return rslt
+}
+
+// TryListParent tries to make the 'n'-th <ul> ot <ol> parent the active one.
+func (ht *HTMLTree) TryListParent(n int) error {
+	i := 0
+	for n >= 0 {
+		atList := ht.br.ID == "ul" || ht.br.ID == "ol"
+		if atList {
+			n--
+		}
+		if n >= 0 {
+			var br *branch.Branch
+			err := ht.TryParent(1)
+			if atList {
+				br = ht.br
+				i++
+			}
+			if err != nil {
+				return err
+			}
+
+			if ht.br == ht.root {
+				// use the last parent of the "ul" or "ol" branch
+				ht.br = br
+				return nil
+			}
+		}
+	}
+
+	if i > 0 {
+		l := len(ht.lstIndnts)
+		ht.popIndents(l - i)
+	}
+	return nil
 }
 
 // TryParent goes safely to the 'n'-th parent of the current branch.
