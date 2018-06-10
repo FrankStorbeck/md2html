@@ -90,21 +90,24 @@ type Config struct {
 func BuildHTMLTree(f *os.File) (*branch.Branch, error) {
 	buf := bufio.NewReader(f)
 
-	st := NewHTMLTree(cBody)
-	st.br, _ = st.root.AddBranch(-1, cP)
+	ht := NewHTMLTree(cBody)
+	ht.br, _ = ht.root.AddBranch(-1, cP)
 
 	for {
-		line, err := buf.ReadString('\n')
-		if err != nil && err != io.EOF {
-			return st.root, err
+		line, readErr := buf.ReadString('\n')
+		if readErr != nil && readErr != io.EOF {
+			return ht.root, readErr
 		}
-		st.Build(line)
-		if err == io.EOF {
+		buildErr := ht.Build(line)
+		if buildErr != nil {
+			log.Print(buildErr)
+		}
+		if readErr == io.EOF {
 			break
 		}
 	}
 
-	return st.root, nil
+	return ht.root, nil
 }
 
 // Configure sets the configuration for 'main' based on its flags.

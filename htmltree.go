@@ -11,7 +11,6 @@
 // Code licensed under the BSD License:
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are met:
-//
 // 1. Redistributions of source code must retain the above copyright notice,
 //    this list of conditions and the following disclaimer.
 //
@@ -51,7 +50,7 @@ type TableInfo []int
 type HTMLTree struct {
 	blockQuoteLevel int              // level for blockQuote
 	br              *branch.Branch   // current branch
-	isHighLited     bool             // true when text is high ligted
+	isHighLighted   bool             // true when text is high ligted
 	isQuoted        bool             // true is the lines are precoded quotes
 	lstIndnts       []int            // positions for indents for lists items
 	lstParents      []*branch.Branch // parents of start list
@@ -62,9 +61,10 @@ type HTMLTree struct {
 	tblInfo         TableInfo        // table information
 }
 
+// ListIndents is a struct holding data for the indentiation if list items.
 type ListIndents struct {
-	indent int
-	parent *branch.Branch
+	indent int            // number uf spaces for the indentiation
+	parent *branch.Branch // the parent branch for the indentiation
 }
 
 const (
@@ -73,39 +73,6 @@ const (
 	right
 	center
 )
-
-// popIndents pops 'n' ListIndents from the ht.lstIndnts stack
-func (ht *HTMLTree) popIndents(n int) {
-	if n < 0 {
-		n = 0
-	}
-	if n >= len(ht.lstIndnts) {
-		n = len(ht.lstIndnts) - 1
-		if n < 0 {
-			return
-		}
-	}
-	ht.br = ht.lstParents[n]
-	ht.nextIndnt = ht.lstIndnts[n]
-	ht.lstIndnts = ht.lstIndnts[:n]
-	ht.lstParents = ht.lstParents[:n]
-}
-
-// pushIndents pushes 'indnt' on the 'ht.lstIndnts' stack
-func (ht *HTMLTree) pushIndents(indnt int) {
-	ht.lstIndnts = append(ht.lstIndnts, ht.nextIndnt)
-	ht.lstParents = append(ht.lstParents, ht.br)
-	ht.nextIndnt = indnt
-}
-
-func (ht *HTMLTree) testLeadingHash(s string) bool {
-	if leadingHash := CountLeading(s, '#', 6); leadingHash > 0 {
-		// <h'leadingHash'> line
-		ht.Header(s[leadingHash:], leadingHash)
-		return true
-	}
-	return false
-}
 
 // BlockQuote adds string 's' as a block quote. If it isn't a continuation of
 // a bock quote, it will be initialized.
@@ -135,16 +102,14 @@ func (ht *HTMLTree) Build(s string) error {
 	var err error
 	ht.sCount++
 	indnt := CountLeading(s, ' ', -1)
-	s = strings.TrimRight(s, "\n\r")
-	s = Break(s)
-	// s = Inline(strings.Repeat(" ", indnt) + strings.TrimLeftFunc(s, unicode.IsSpace))
-	s = Inline(s)
+	s = Inline(Break(strings.TrimRight(s, "\n\r")))
 
 	if l := len(s); l > 0 {
 		nEnd := strings.Index(s[indnt:], ".") // end of number for ordered list
 		if nEnd > 0 {
 			_, err = strconv.Atoi(s[indnt : indnt+nEnd])
 			if err != nil {
+				err = nil
 				nEnd = 0
 			}
 		}
@@ -158,9 +123,9 @@ func (ht *HTMLTree) Build(s string) error {
 		switch {
 		case ht.blockQuoteLevel <= 0 && l >= 3 && s[:3] == "```":
 			// Syntactic hightlighting starts or ends
-			return ht.HighLite()
+			return ht.HighLight()
 
-		case ht.isHighLited:
+		case ht.isHighLighted:
 			ht.br.Add(-1, html.EscapeString(raw))
 			return nil
 
@@ -197,7 +162,7 @@ func (ht *HTMLTree) Build(s string) error {
 					return errors.New("negative index by IndentIndex()")
 				}
 				if n < len(ht.lstIndnts)-1 {
-					ht.popIndents(n + 1)
+					ht.PopIndents(n + 1)
 					for _, s := range ht.br.Siblings() {
 						if b, ok := s.(*branch.Branch); ok {
 							ht.br = b // use the last branch
@@ -205,10 +170,10 @@ func (ht *HTMLTree) Build(s string) error {
 					}
 				}
 			} else {
-				if ht.testLeadingHash(s) {
+				if ht.TestLeadingHash(s) {
 					return nil
 				}
-				ht.popIndents(0)
+				ht.PopIndents(0)
 				if ht.br.ID != cP {
 					ht.br, _ = ht.br.AddBranch(-1, cP)
 					ht.parCount = 1
@@ -219,7 +184,7 @@ func (ht *HTMLTree) Build(s string) error {
 
 		switch ht.parCount {
 		case 0:
-			if ht.testLeadingHash(s) {
+			if ht.TestLeadingHash(s) {
 				return nil
 			}
 			if ht.br.ID != cP {
@@ -249,13 +214,13 @@ func (ht *HTMLTree) Build(s string) error {
 	} else {
 		// empty line
 		switch {
-		case ht.isHighLited:
+		case ht.isHighLighted:
 			ht.br.Add(-1, raw)
 			return nil
 
 		case len(ht.tblInfo) > 0:
 			// end of table
-			err = ht.TryParent(1)
+			err = ht.MakeErr("Build", ht.TryParent(1))
 			ht.tblInfo = TableInfo{}
 			ht.br, _ = ht.br.AddBranch(-1, cP)
 			ht.parCount = 0
@@ -263,7 +228,7 @@ func (ht *HTMLTree) Build(s string) error {
 		case ht.blockQuoteLevel > 0:
 			err = ht.TryParent(ht.blockQuoteLevel)
 			if err != nil {
-				return err
+				return ht.MakeErr("Build", err)
 			}
 			ht.blockQuoteLevel = 0
 
@@ -303,7 +268,7 @@ func (ht *HTMLTree) ChangePrevToTblHdr(s string, newTblInfo *TableInfo) error {
 	ht.tblInfo = *newTblInfo
 	ln, err := ht.br.Remove(-1)
 	if err != nil {
-		return err
+		return ht.MakeErr("ChangePrevToTblHdr", err)
 	}
 
 	s, ok := ln.(string)
@@ -316,7 +281,7 @@ func (ht *HTMLTree) ChangePrevToTblHdr(s string, newTblInfo *TableInfo) error {
 		} else {
 			err = ht.TryParent(1)
 			if err != nil {
-				return err
+				return ht.MakeErr("ChangePrevToTblHdr", err)
 			}
 			ht.br.Add(-1, s)
 			ht.tblInfo = TableInfo{}
@@ -367,7 +332,6 @@ func CountTblColls(s string) TableInfo {
 				if !OnlyRunes(c, '-') {
 					return TableInfo{}
 				}
-				// tblInfo[i] = noAlign
 			}
 		}
 	}
@@ -386,18 +350,18 @@ func (ht *HTMLTree) Header(s string, n int) {
 	ht.Reset()
 }
 
-// HighLite highlites the text 's'.
-func (ht *HTMLTree) HighLite() error {
+// HighLight highlights the text 's'.
+func (ht *HTMLTree) HighLight() error {
 	var err error
-	// Syntactic hightlighting starts or ends
-	ht.isHighLited = !ht.isHighLited
-	if ht.isHighLited { // starts
+	// Syntactic highlighting starts or ends
+	ht.isHighLighted = !ht.isHighLighted
+	if ht.isHighLighted { // starts
 		ht.br, _ = ht.br.AddBranch(-1, "pre")
 		ht.br, _ = ht.br.AddBranch(-1, "code")
 	} else {
 		err = ht.TryParent(2)
 		if err != nil {
-			return err
+			return ht.MakeErr("HighLight)", err)
 		}
 	}
 
@@ -435,18 +399,17 @@ func (ht *HTMLTree) ListItem(s string, indnt, nEnd int) error {
 	} else {
 		err := ht.TryListParent(0)
 		if err != nil {
-			return err
+			return ht.MakeErr("ListItem", err)
 		}
 	}
 
-	// var err error
 	nIndents := len(ht.lstIndnts)
 	n := ht.IndentIndex(indnt)
 
 	switch {
 	case n >= nIndents:
 		// start a new indent level
-		ht.pushIndents(indnt + nEnd + CountLeading(s[indnt+nEnd+1:], ' ', -1) + 1)
+		ht.PushIndents(indnt + nEnd + CountLeading(s[indnt+nEnd+1:], ' ', -1) + 1)
 		tg := "ul"
 		if nEnd > 0 {
 			tg = "ol"
@@ -456,15 +419,24 @@ func (ht *HTMLTree) ListItem(s string, indnt, nEnd int) error {
 	case n == nIndents-1:
 		// continuation of current indent level
 
-	default: // n < nIndents - 1
+	default:
 		// use older indent level
-		ht.popIndents(n + 1)
+		ht.PopIndents(n + 1)
 	}
 
 	ht.br, _ = ht.br.AddBranch(-1, "li")
 	ht.br.Add(-1, strings.TrimSpace(s[indnt+nEnd+1:]))
 
 	return nil
+}
+
+// MakeErr creates an error with some extra information about the code that
+// generated it.
+func (ht *HTMLTree) MakeErr(name string, err error) error {
+	if err == nil {
+		return nil
+	}
+	return fmt.Errorf("%s (%d): %s", name, ht.sCount, err)
 }
 
 // NewHTMLTree returns a pointer to a new HTMLTree struct.
@@ -490,6 +462,30 @@ func Plain(s string) string {
 	return s
 }
 
+// PopIndents pops 'n' ListIndents from the ht.lstIndnts stack
+func (ht *HTMLTree) PopIndents(n int) {
+	if n < 0 {
+		n = 0
+	}
+	if n >= len(ht.lstIndnts) {
+		n = len(ht.lstIndnts) - 1
+		if n < 0 {
+			return
+		}
+	}
+	ht.br = ht.lstParents[n]
+	ht.nextIndnt = ht.lstIndnts[n]
+	ht.lstIndnts = ht.lstIndnts[:n]
+	ht.lstParents = ht.lstParents[:n]
+}
+
+// PushIndents pushes 'indnt' on the 'ht.lstIndnts' stack
+func (ht *HTMLTree) PushIndents(indnt int) {
+	ht.lstIndnts = append(ht.lstIndnts, ht.nextIndnt)
+	ht.lstParents = append(ht.lstParents, ht.br)
+	ht.nextIndnt = indnt
+}
+
 // Quote makes the lines show up as pre coded text 's'.
 func (ht *HTMLTree) Quote(line string) error {
 	if !ht.isQuoted {
@@ -505,7 +501,7 @@ func (ht *HTMLTree) Quote(line string) error {
 func (ht *HTMLTree) Reset() {
 	ht.br = ht.root
 	ht.blockQuoteLevel = 0
-	ht.isHighLited = false
+	ht.isHighLighted = false
 	ht.isQuoted = false
 	ht.lstIndnts = nil
 	ht.lstParents = nil
@@ -518,7 +514,7 @@ func (ht *HTMLTree) RmIfEmpty(brnch *branch.Branch) error {
 	if brnch != ht.root && brnch.Len() <= 0 {
 		if i, err := ht.br.Index(brnch); err == nil {
 			_, err = ht.br.Remove(i)
-			return err
+			return ht.MakeErr("RmIfEmpty", err)
 		}
 	}
 	return nil
@@ -534,12 +530,23 @@ func (ht *HTMLTree) TblRow(s string, hdr bool) error {
 		// end of table
 		err = ht.TryParent(1)
 		if err != nil {
-			return err
+			return ht.MakeErr("TblRow", err)
 		}
 		ht.tblInfo = TableInfo{}
 		ht.br.Add(-1, s)
 	}
 	return nil
+}
+
+// TestLeadingHash tests for a <hn> string. If it is, a header line will be
+// added.
+func (ht *HTMLTree) TestLeadingHash(s string) bool {
+	if leadingHash := CountLeading(s, '#', 6); leadingHash > 0 {
+		// <h'leadingHash'> line
+		ht.Header(s[leadingHash:], leadingHash)
+		return true
+	}
+	return false
 }
 
 // Traverse traverses a slice of siblings. For each string found the function
@@ -563,7 +570,7 @@ func Traverse(intf []interface{}, f func(string) []interface{}) []interface{} {
 }
 
 // TRow returns a branch holding a table row. If hdr is true, a table header
-// is asumed. tblInfo holds the TableInfo for the table collumns ,
+// is asumed. tblInfo holds the TableInfo for the table collumns.
 func TRow(s string, hdr bool, tblInfo *TableInfo) *branch.Branch {
 	cols := strings.Split(strings.TrimSpace(CodeUni(s, []byte{'|'}, true)), "|")
 
@@ -622,7 +629,7 @@ func (ht *HTMLTree) TryListParent(n int) error {
 				i++
 			}
 			if err != nil {
-				return err
+				return ht.MakeErr("TryListParent", err)
 			}
 
 			if ht.br == ht.root {
@@ -635,7 +642,7 @@ func (ht *HTMLTree) TryListParent(n int) error {
 
 	if i > 0 {
 		l := len(ht.lstIndnts)
-		ht.popIndents(l - i)
+		ht.PopIndents(l - i)
 	}
 	return nil
 }
@@ -654,8 +661,7 @@ func (ht *HTMLTree) TryParent(n int) error {
 		b := ht.br
 		ht.br, err = ht.br.Parent(1)
 		if err != nil {
-			err = fmt.Errorf("TryParent (%d): %s", ht.sCount, err)
-			return err
+			return ht.MakeErr("TryParent", err)
 		}
 
 		ht.RmIfEmpty(b)

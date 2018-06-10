@@ -24,8 +24,8 @@ Usage of md2html:
 Recognised formatting
 ---------------------
 
-hd2htm adheres to
-https://daringfireball.net/projects/markdown/syntax
+md2html adheres to
+`https://daringfireball.net/projects/markdown/syntax`
 
 but note:
 
@@ -39,6 +39,6 @@ but note:
 
 
 See also:
-https://guides.github.com/features/mastering-markdown/
+`https://guides.github.com/features/mastering-markdown/`
 or
-https://help.github.com/articles/basic-writing-and-formatting-syntax/
+`https://help.github.com/articles/basic-writing-and-formatting-syntax/`
