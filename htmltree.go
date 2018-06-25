@@ -39,7 +39,7 @@ import (
 	"strconv"
 	"strings"
 
-	"source.storbeck.nl/md2html/branch"
+	"github.com/FrankStorbeck/md2html/branch"
 )
 
 // TableInfo holds table data.
