@@ -7,7 +7,7 @@
 // branch implements a tree data stucture
 //
 // Copyright © 2018 Frank Storbeck. All rights reserved.
-// Code licensed under the BSD License:
+// Code licensed under the BSD License: see licence.txt
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are met:
 //
@@ -18,18 +18,11 @@
 //    this list of conditions and the following disclaimer in the documentation
 //    and/or other materials provided with the distribution.
 //
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-// ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
-// LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
-// CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
-// SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
-// INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
-// CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
-// ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-// POSSIBILITY OF SUCH DAMAGE.
 
+// Package branch can be used storing abitrary data in tree data stucture.
+// It starts with a base branch that can hold a set of leaves and other
+// branches. Togeter they are denoted as siblings. Each branch knows about the
+// branch that holds it as one of its siblings, exept of course the base branch.
 package branch
 
 import (
@@ -38,59 +31,65 @@ import (
 	"strings"
 )
 
+// Error codes
 var (
-	ErrNoSiblings     = errors.New("no siblings")
-	ErrNoSiblingFound = errors.New("no sibling found")
+	ErrNoSiblings     = errors.New("No siblings")
+	ErrNoSiblingFound = errors.New("No sibling found")
 )
 
-// Branch holds the data for a branch originating from a parent branch.
+// Branch holds the data for a branch.
 type Branch struct {
-	ID       string        // identifier for the branch
+	ID       string        // identifier for this branch
 	Info     string        // some optional description
-	parent   *Branch       // parent for wich this one is a sibling
+	parent   *Branch       // parent for wich this branch is a sibling
 	siblings []interface{} // its siblings
 }
 
-// Add adds 'sls' to the slice of siblings just before sibling 'n', or, if 'n'
-// is less than zero, after the last sibling. When an error occured, it will be
-// returned.
-func (br *Branch) Add(n int, sls ...interface{}) error {
+// NewBranch returns a pointer to a new Branch struct with identifier id.
+func NewBranch(id string) *Branch {
+	return &Branch{ID: id, siblings: make([]interface{}, 0)}
+}
+
+// Add adds a number of new siblings. If n is non negative, they will appended
+// to the currently present siblings. Otherwise they will be added just before
+// the n-th sibling.
+func (br *Branch) Add(n int, new ...interface{}) error {
 	var err error
 	n, err = br.testIndx(n)
 	if err != nil {
 		return err
 	}
 
-	lbrs := len(br.siblings)
-	lsls := len(sls)
-	l := lbrs + lsls
+	lCur := len(br.siblings)
+	lNew := len(new)
+	l := lCur + lNew
 	if n < 0 {
-		n = lbrs
+		n = lCur
 	}
 
-	siblings := make([]interface{}, l)
-	for i := 0; i < lbrs; i++ {
+	sblngs := make([]interface{}, l)
+	for i := 0; i < lCur; i++ {
 		if i < n {
-			siblings[i] = br.siblings[i]
+			sblngs[i] = br.siblings[i]
 		} else {
-			siblings[i+lsls] = br.siblings[i]
+			sblngs[i+lNew] = br.siblings[i]
 		}
 	}
-	for i, s := range sls {
-		siblings[n+i] = s
+	for i, s := range new {
+		sblngs[n+i] = s
 		if b, ok := s.(*Branch); ok {
 			b.parent = br
 		}
 	}
 
-	br.siblings = siblings
+	br.siblings = sblngs
 	return nil
 }
 
-// AddBranch adds a new branch with identifier 'id' just before the 'n'-th
-// sibling, or, if 'n' is less than zero, after the last sibling. A
-// pointer to the inserted branch will be returned. When an error occured, nil
-// and the error will be returned.
+// AddBranch adds a new branch with identifier id. If n is negative, it will
+// appended to the currently present siblings. Otherwise it will be added just
+// before the n-th sibling. If successfull, a pointer to the inserted branch
+// will be returned.
 func (br *Branch) AddBranch(n int, id string) (*Branch, error) {
 	var err error
 	n, err = br.testIndx(n)
@@ -102,31 +101,13 @@ func (br *Branch) AddBranch(n int, id string) (*Branch, error) {
 	return b, nil
 }
 
-// Len returns the number of siblings for the branch.
+// Len returns the number of siblings.
 func (br *Branch) Len() int {
 	return len(br.siblings)
 }
 
-func escape(s string, brackets bool) string {
-	if brackets {
-		s = strings.Replace(s, "(", "\\(", -1)
-		s = strings.Replace(s, ")", "\\)", -1)
-	} else {
-		s = strings.Replace(s, "{", "\\{", -1)
-		s = strings.Replace(s, "}", "\\}", -1)
-		s = strings.Replace(s, "\"", "\\\"", -1)
-	}
-	return s
-}
-
-// NewBranch returns a pointer to a new Branch struct with identifier 's'.
-func NewBranch(s string) *Branch {
-	return &Branch{ID: s, siblings: make([]interface{}, 0)}
-}
-
-// Parent returns a pointer to the 'n'-th parent of branch. If 'n' is less than
-// one a pointer to itself will be returned. When an error occured, nil and the
-// error will be returned.
+// Parent returns a pointer to the n-th parent of the branch. If n is non
+// positive a pointer to itself will be returned.
 func (br *Branch) Parent(n int) (*Branch, error) {
 	p := br
 	for n > 0 {
@@ -138,65 +119,64 @@ func (br *Branch) Parent(n int) (*Branch, error) {
 	return p, nil
 }
 
-// ParentById returns a pointer to the first parent with an ID equal to 'id'.
-// When an error occured, nil and the error will be returned.
-func (br *Branch) ParentById(id string) (*Branch, error) {
-	for br.ID != id {
+// ParentID returns a pointer to itself or the first parent with an ID equal to
+// id.
+func (br *Branch) ParentID(id string) (*Branch, error) {
+	b := br
+	for b.ID != id {
 		var err error
-		br, err = br.Parent(1)
+		b, err = b.Parent(1)
 		if err != nil {
 			return nil, err
 		}
 	}
-	return br, nil
+	return b, nil
 }
 
-// Index returns the index of 'intf' in the slice with siblings. If it cannot
-// be found, it returns -1 and an error.
-func (br *Branch) Index(intf interface{}) (int, error) {
-	for n, sblg := range br.siblings {
-		if sblg == intf {
+// Index returns the index of sblng. If it cannot be found it returns -1 and
+// ErrNoSiblingFound.
+func (br *Branch) Index(sblng interface{}) (int, error) {
+	for n, sb := range br.siblings {
+		if sb == sblng {
 			return n, nil
 		}
 	}
 	return -1, ErrNoSiblingFound
 }
 
-// Remove removes the 'n'-th sibling, or, if 'n' is less than zero, the last
-// sibling. It returns a pointer to the removed sibling. When an error occured,
-// nil and the error will be returned.
+// Remove removes the n-th sibling. If n is negative, the last sibling will be
+// removed. It returns a pointer to the removed sibling.
 func (br *Branch) Remove(n int) (interface{}, error) {
-
 	l := len(br.siblings)
 	if l <= 0 {
 		return nil, ErrNoSiblings
 	}
 
 	if n < 0 {
-		sblg := br.siblings[l-1]
+		sb := br.siblings[l-1]
 		br.siblings = br.siblings[:l-1]
-		return sblg, nil
+		return sb, nil
 	}
 
-	rslt := make([]interface{}, l-1)
-	var sblg interface{}
+	sblngs := make([]interface{}, l-1)
+	var sb interface{}
 	j := 0
 	for i := 0; i < l; i++ {
 		if i != n {
-			rslt[j] = br.siblings[i]
+			sblngs[j] = br.siblings[i]
 			j++
 		} else {
-			sblg = br.siblings[i]
+			sb = br.siblings[i]
 		}
 	}
 
-	br.siblings = rslt
-	return sblg, nil
+	br.siblings = sblngs
+	return sb, nil
 }
 
 // RemoveAll removes all siblings
 func (br *Branch) RemoveAll() {
-	br.siblings = []interface{}{}
+	br.siblings = make([]interface{}, 0)
 }
 
 // Siblings returns a slice with all the siblings for this branch.
@@ -243,6 +223,31 @@ func (br *Branch) String() string {
 	return s + "}"
 }
 
+// TreePath returns a string holding the tree path ending at 'b'. The path has
+// the format "/root.ID/.../br.ID".
+func (br *Branch) TreePath() string {
+	s := ""
+	for br != nil {
+		s = br.ID + "/" + s
+		br = br.parent
+	}
+	return "/" + s
+}
+
+// escape returns a string in wich some characters in s will be escaped.
+func escape(s string, brackets bool) string {
+	if brackets {
+		s = strings.Replace(s, "(", "\\(", -1)
+		s = strings.Replace(s, ")", "\\)", -1)
+	} else {
+		s = strings.Replace(s, "{", "\\{", -1)
+		s = strings.Replace(s, "}", "\\}", -1)
+		s = strings.Replace(s, "\"", "\\\"", -1)
+	}
+	return s
+}
+
+// testIndx tests if n is a valid index for the slice holding the siblings.
 func (br *Branch) testIndx(n int) (int, error) {
 	l := len(br.siblings)
 	if l <= 0 {
@@ -259,15 +264,4 @@ func (br *Branch) testIndx(n int) (int, error) {
 		n = -1
 	}
 	return n, nil
-}
-
-// TreePath returns a string holding the tree path ending at 'b'. The path has
-// the format "/root.ID/.../br.ID".
-func (br *Branch) TreePath() string {
-	s := ""
-	for br != nil {
-		s = br.ID + "/" + s
-		br = br.parent
-	}
-	return "/" + s
 }

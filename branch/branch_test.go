@@ -173,12 +173,12 @@ func TestIdParent(t *testing.T) {
 	}
 
 	for i := 0; i < l; i++ {
-		p, err := b.ParentById(brnchs[i].id)
+		p, err := b.ParentID(brnchs[i].id)
 		if err != nil {
-			t.Fatalf("ParentById(%q) generates an error: %q", brnchs[i].id, err)
+			t.Fatalf("ParentId(%q) generates an error: %q", brnchs[i].id, err)
 		}
 		if p.ID != brnchs[i].id {
-			t.Fatalf("ParentById(%q).ID is %q, should be %q", brnchs[i].id, p.ID,
+			t.Fatalf("ParentId(%q).ID is %q, should be %q", brnchs[i].id, p.ID,
 				brnchs[i].id)
 		}
 	}
