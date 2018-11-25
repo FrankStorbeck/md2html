@@ -7,7 +7,7 @@
 // tools for md2html.go.
 //
 // Copyright © 2018 Frank Storbeck. All rights reserved.
-// Code licensed under the BSD License:
+// Code licensed under the BSD License: see licence.txt
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are met:
 //
@@ -18,17 +18,6 @@
 //    this list of conditions and the following disclaimer in the documentation
 //    and/or other materials provided with the distribution.
 //
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-// ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
-// LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
-// CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
-// SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
-// INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
-// CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
-// ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-// POSSIBILITY OF SUCH DAMAGE.
 
 package main
 
@@ -38,6 +27,8 @@ import (
 	"html"
 	"strings"
 	"unicode"
+
+	"source.storbeck.nl/md2html/branch"
 )
 
 // Break adds a break when the line ends with two or more spaces. It also slices
@@ -70,6 +61,70 @@ func CodeUni(s string, runes []byte, esc bool) string {
 	return string(b)
 }
 
+// CountLeading returns the number of leading runes 'rn' in string 's'. 'm'
+// is the maximum that is alowed. When 'm' is less than 0, unlimited runes are
+// alowed.
+func CountLeading(s string, rn rune, m int) int {
+	n := 0
+	for _, r := range s {
+		switch r {
+		case rn:
+			n++
+			if m >= 0 && n > m {
+				return 0
+			}
+		default:
+			return n
+		}
+	}
+	return 0
+}
+
+// CountTblColls test if a table separator line is found, and if true it
+// analyses the table structure
+func CountTblColls(s string) TableInfo {
+	cols := strings.Split(strings.TrimSpace(s), "|")
+
+	l := len(cols)
+	if l < 3 || len(cols[0]) > 0 || len(cols[l-1]) > 0 {
+		return TableInfo{}
+	}
+
+	tblInfo := make(TableInfo, len(cols)-2)
+	cols = cols[1 : l-1] // trim first and last elements
+
+	for i, c := range cols {
+		c = strings.TrimSpace(c)
+		l := len(c)
+		if l > 0 {
+
+			if c1 := strings.Index(c, ":"); c1 == 0 {
+				if c2 := strings.Index(c[1:], ":"); c2 == l-2 {
+					if !OnlyRunes(c[1:l-1], '-') {
+						return TableInfo{}
+					}
+					tblInfo[i] = center
+				} else {
+					if !OnlyRunes(c[1:], '-') {
+						return TableInfo{}
+					}
+					tblInfo[i] = left
+				}
+			} else if c1 == l-1 {
+				if !OnlyRunes(c[:l-1], '-') {
+					return TableInfo{}
+				}
+				tblInfo[i] = right
+			} else {
+				if !OnlyRunes(c, '-') {
+					return TableInfo{}
+				}
+			}
+		}
+	}
+	return tblInfo
+}
+
 // DecodeUni replaces unicoded runes a by the rune itself as given in 'runes'.
 // When 'esc' is true, the rune will be escaped by placing a '\' char in front
 // of it.
@@ -88,39 +143,6 @@ func DecodeUni(s string, runes []byte, esc bool) string {
 	}
 
 	return string(b)
-}
-
-// OnlyRunes tests if a string consists of one or more runes 'rn' and no
-// other runes.
-func OnlyRunes(s string, rn rune) bool {
-	if len(s) < 1 {
-		return false
-	}
-	for _, r := range s {
-		if r != rn {
-			return false
-		}
-	}
-	return true
-}
-
-// CountLeading returns the number of leading runes 'rn' in string 's'. 'm'
-// is the maximum that is alowed. When 'm' is less than 0, unlimited runes are
-// alowed.
-func CountLeading(s string, rn rune, m int) int {
-	n := 0
-	for _, r := range s {
-		switch r {
-		case rn:
-			n++
-			if m >= 0 && n > m {
-				return 0
-			}
-		default:
-			return n
-		}
-	}
-	return 0
 }
 
 // Images translates mark down image definitions to their html equivalents
@@ -181,6 +203,34 @@ func Links(s string) string {
 	return s
 }
 
+// OnlyRunes tests if a string consists of one or more runes 'rn' and no
+// other runes.
+func OnlyRunes(s string, rn rune) bool {
+	if len(s) < 1 {
+		return false
+	}
+	for _, r := range s {
+		if r != rn {
+			return false
+		}
+	}
+	return true
+}
+
+// Plain changes spaces in s to '-', puts everything in lower case and finally
+// removes all tag info.
+func Plain(s string) string {
+	s = strings.ToLower(strings.Replace(s, " ", "-", -1))
+
+	tags := []string{cCode, "strong", "em", "del"}
+	for _, t := range tags {
+		s = strings.Replace(s, "<"+t+">", "", -1)
+		s = strings.Replace(s, "</"+t+">", "", -1)
+	}
+
+	return s
+}
+
 // StrongEmDel translates mark down strong, emphasis and deleted definitions
 // to their html equivalents
 func StrongEmDel(s string) string {
@@ -224,4 +274,47 @@ func StrongEmDel(s string) string {
 	}
 
 	return DecodeUni(s, seps, false)
+}
+// TRow returns a branch holding a table row. If hdr is true, a table header
+// is asumed. tblInfo holds the TableInfo for the table collumns.
+func TRow(s string, hdr bool, tblInfo *TableInfo) *branch.Branch {
+	cols := strings.Split(strings.TrimSpace(CodeUni(s, []byte{'|'}, true)), "|")
+
+	l := len(cols)
+	if l < 3 || len(cols[0]) > 0 || len(cols[l-1]) > 0 {
+		return nil
+	}
+
+	cols = cols[1 : l-1]
+	l = l - 2
+	if l > len(*tblInfo) {
+		l = len(*tblInfo)
+		cols = cols[:l]
+	}
+	rslt := &branch.Branch{ID: cTr}
+	br := rslt
+
+	tag := cTd
+	if hdr {
+		tag = cTh
+	}
+
+	for i, col := range cols {
+		br, _ = br.AddBranch(-1, tag)
+
+		if (*tblInfo)[i] > 0 {
+			a := "left"
+			switch (*tblInfo)[i] {
+			case right:
+				a = "right"
+			case center:
+				a = "center"
+			}
+			br.Info = fmt.Sprintf("style=\"text-align: %s\"", a)
+		}
+
+		br.Add(-1, strings.TrimSpace(CodeUni(col, []byte{'|'}, true)))
+		br, _ = br.Parent(1)
+	}
+	return rslt
 }

@@ -8,7 +8,7 @@
 // HTML equivalent.
 //
 // Copyright © 2018 Frank Storbeck. All rights reserved.
-// Code licensed under the BSD License:
+// Code licensed under the BSD License: see licence.txt
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are met:
 //
@@ -19,17 +19,6 @@
 //    this list of conditions and the following disclaimer in the documentation
 //    and/or other materials provided with the distribution.
 //
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-// ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
-// LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
-// CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
-// SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
-// INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
-// CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
-// ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-// POSSIBILITY OF SUCH DAMAGE.
 
 package main
 
@@ -64,7 +53,6 @@ const (
 	cP          = "p"
 	cPre        = "pre"
 	cQ          = "q"
-	cCrLf       = "\r\n"
 	cScript     = "script"
 	cStyle      = "style"
 	cTable      = "table"
@@ -73,7 +61,7 @@ const (
 	cTitle      = "title"
 	cTr         = "tr"
 	cUl         = "ul"
-	cVersion    = "1.0"
+	cVersion    = "1.1"
 )
 
 // Config holds all configuration data
@@ -85,10 +73,9 @@ type Config struct {
 }
 
 // BuildHTMLTree returns a pointer to a branch struct with all HTML elements
-// from a named mark down file. In case of an error 'nil' and the error will be
-// returned.
-func BuildHTMLTree(f *os.File) (*branch.Branch, error) {
-	buf := bufio.NewReader(f)
+// from a named mark down file.
+func (cfg *Config)BuildHTMLTree() (*branch.Branch, error) {
+	buf := bufio.NewReader(cfg.fIn)
 
 	ht := NewHTMLTree(cBody)
 	ht.br, _ = ht.root.AddBranch(-1, cP)
@@ -114,18 +101,18 @@ func BuildHTMLTree(f *os.File) (*branch.Branch, error) {
 func Configure() *Config {
 	cfg := new(Config)
 
-	// parse de argumenten
+	// parse the arguments
 	version := flag.Bool("version", false, "Show version number and exit")
-	if *version {
-		fmt.Printf("Version %s\n", cVersion)
-	}
-
 	input := flag.String("in", "stdin", "path to input file")
 	output := flag.String("out", "stdout", "path to output file")
 	flag.StringVar(&cfg.title, cTitle, "", "title for HTML document")
 	flag.StringVar(&cfg.style, cStyle, "", "style sheet for HTML document")
 
 	flag.Parse()
+	if *version {
+		fmt.Printf("Version %s\n", cVersion)
+	}
+
 
 	var err error
 	cfg.fIn = os.Stdin
@@ -159,24 +146,31 @@ func HTMLCode(br *branch.Branch, lvl int) string {
 		indnt = strings.Repeat(" ", lvl)
 	}
 
-	s := ""
+	// s := ""
+	sbr := &strings.Builder{}
 	switch br.ID {
 	case cTable:
-		s = cCrLf
+		// s = cCrLf
+		sbr.WriteString("\r\n")
 	}
-	s = s + indnt + "<" + br.ID
+	// s = s + indnt + "<" + br.ID
+	fmt.Fprintf(sbr, "%s<%s", indnt, br.ID)
 	if len(br.Info) > 0 {
-		s = s + " " + strings.TrimSpace(br.Info)
+		// s = s + " " + strings.TrimSpace(br.Info)
+		sbr.WriteString(" "+strings.TrimSpace(br.Info))
 	}
 
 	switch br.ID {
 	case cLink, cMeta:
-		s = s + "/>\n"
+		// s = s + "/>\n"
+		sbr.WriteString("/>\r\n")
 	default:
-		s = s + ">"
+		// s = s + ">"
+		fmt.Fprintf(sbr, ">")
 		switch br.ID {
 		case cBlockQuote, cBody, cCode, cHead, cHTML, cOl, cPre, cTable, cTr, cUl:
-			s = s + cCrLf
+			// s = s + cCrLf
+			sbr.WriteString("\r\n")
 		}
 
 		spc := ""
@@ -191,41 +185,50 @@ func HTMLCode(br *branch.Branch, lvl int) string {
 					l++
 				default:
 				}
-				s = s + HTMLCode(k, l)
+				// s = s + HTMLCode(k, l)
+				sbr.WriteString(HTMLCode(k, l))
 				spc = ""
 			case string:
-				s = s + spc + k
-				if s[len(s)-1] == '\n' {
+				// s = s + spc + k
+				sbr.WriteString(spc+k)
+				if l:=len(k); l > 0 && k[l-1] == '\n' {
 					spc = ""
 				} else {
 					spc = " "
 				}
 			default:
-				// s = s + string(k)
+				// // s = s + string(k)
+				// sbr.WriteString(k)
 			}
 		}
 
-		nl := ""
+		// nl := ""
 		switch br.ID {
 		case cBlockQuote:
-			nl = cCrLf + indnt
+			// nl = "\r\n" + indnt
+			sbr.WriteString("\r\n" + indnt)
 		case cBody, cCode, cHead, cOl, cPre, cTable, cTr, cUl:
-			nl = indnt
+			// nl = indnt
+			sbr.WriteString(indnt)
 		}
 
-		s = s + nl + "</" + br.ID + ">"
+		// s = s + nl + "</" + br.ID + ">"
+		fmt.Fprintf(sbr, "</%s>", br.ID)
 
 		if lvl >= 0 {
 			switch br.ID {
 			case cTable:
-				s = s + cCrLf + strings.Repeat(" ", lvl-1)
+				// s = s + cCrLf + strings.Repeat(" ", lvl-1)
+				sbr.WriteString("\r\n" + strings.Repeat(" ", lvl-1))
 			case cBody, cBlockQuote, cCode, cHead, cHTML, cH1, cH2, cH3, cH4, cH5,
 				cH6, cLi, cLink, cOl, cP, cPre, cQ, cTitle, cScript, cStyle, cTd, cTh, cTr, cUl:
-				s = s + cCrLf
+				// s = s + cCrLf
+				sbr.WriteString("\r\n")
 			}
 		}
 	}
-	return s
+	// return s
+	return sbr.String()
 }
 
 // Header returns a branch holding HTML head data.
@@ -266,7 +269,7 @@ func main() {
 	html := NewHTMLTree(cHTML)
 	html.root.Add(-1, cfg.Header())
 
-	body, err := BuildHTMLTree(cfg.fIn)
+	body, err := cfg.BuildHTMLTree()
 	if err != nil {
 		fmt.Printf("building HTML tree: %s\n", err)
 		os.Exit(1)

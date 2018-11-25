@@ -198,40 +198,48 @@ func (br *Branch) SiblingN(n int) (interface{}, error) {
 	return br.siblings[n], nil
 }
 
-// String returns a string holding the tree in the following format:
-// ID[(Info)]{siblings...}
+// String returns a string showing the contents of the branch.
 func (br *Branch) String() string {
-	s := escape(escape(br.ID, true), false)
+	sb := strings.Builder{}
+	fmt.Fprintf(&sb, "%s", escape(escape(br.ID, true), false))
 	if len(br.Info) > 0 {
-		s = s + "(" + strings.TrimSpace(escape(br.Info, true)) + ")"
+		fmt.Fprintf(&sb, "(%s)", strings.TrimSpace(escape(br.Info, true)))
 	}
 
-	s = s + "{"
+	fmt.Fprintf(&sb, "{")
 	space := ""
 	for _, c := range br.Siblings() {
 		switch k := c.(type) {
 		case *Branch:
-			s = s + space + k.String()
+			fmt.Fprintf(&sb, "%s%s", space, k.String())
 		case string:
-			s = s + space + "\"" + escape(k, false) + "\""
+			fmt.Fprintf(&sb, "%s\"%s\"", space, escape(k, false))
 		default:
-			s = s + fmt.Sprint(k)
+			fmt.Fprintf(&sb, "%s", k)
 		}
 		space = " "
 	}
+	fmt.Fprintf(&sb, "}")
 
-	return s + "}"
+	return sb.String()
 }
 
-// TreePath returns a string holding the tree path ending at 'b'. The path has
+// TreePath returns a string holding the tree path ending at b. The path has
 // the format "/root.ID/.../br.ID".
 func (br *Branch) TreePath() string {
-	s := ""
+	ids := []string{}
+	// s := ""
 	for br != nil {
-		s = br.ID + "/" + s
+		// s = br.ID + "/" + s
+		ids = append(ids, br.ID)
 		br = br.parent
 	}
-	return "/" + s
+	sbr := strings.Builder{}
+	for i := len(ids) - 1; i > 0; i-- {
+		fmt.Fprintf(&sbr, "/%s", ids[i])
+	}
+	// return "/" + s
+	return sbr.String()
 }
 
 // escape returns a string in wich some characters in s will be escaped.
