@@ -28,7 +28,7 @@ import (
 	"strconv"
 	"strings"
 
-	"source.storbeck.nl/md2html/branch"
+	"github.com/FrankStorbeck/md2html/branch"
 )
 
 const (
@@ -92,6 +92,20 @@ func (ht *HTMLTree) BlockQuote(s string) {
 	if len(s) > 0 {
 		ht.br.Add(-1, s)
 	}
+}
+
+// Plain changes spaces in 's' to '-', puts everything in lower case and finally
+// removes all tag info.
+func Plain(s string) string {
+	s = strings.ToLower(strings.Replace(s, " ", "-", -1))
+
+	tags := []string{cCode, "strong", "em", "del"}
+	for _, t := range tags {
+		s = strings.Replace(s, "<"+t+">", "", -1)
+		s = strings.Replace(s, "</"+t+">", "", -1)
+	}
+
+	return s
 }
 
 // Plain changes spaces in 's' to '-', puts everything in lower case and finally
